@@ -1,0 +1,8 @@
+{
+  "name": "@test-plugin/test-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "name": "test-plugin"
+  }
+}
