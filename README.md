@@ -6,6 +6,12 @@
 
 [Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/tutorials/react-monorepo-tutorial?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
 
+## To run the plugin
+
+```bash
+npx nx run @test-plugin/nx-plugin:build && nx g @test-plugin/nx-plugin:openapi-client stripe-api --directory ./packages --scope @test-api --client fetch --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml  --verbose
+```
+
 ## Run tasks
 
 To run the dev server for your app, use:

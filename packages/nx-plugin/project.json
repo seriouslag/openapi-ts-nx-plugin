@@ -1,0 +1,37 @@
+{
+  "name": "@test-plugin/nx-plugin",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/openapi-generator/src",
+  "projectType": "library",
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "packages/openapi-generator/dist",
+        "main": "packages/openapi-generator/src/index.ts",
+        "tsConfig": "packages/openapi-generator/tsconfig.lib.json",
+        "rootDir": "packages/openapi-generator/src",
+        "assets": [
+          "packages/openapi-generator/*.md",
+          {
+            "input": "./packages/openapi-generator/src",
+            "glob": "**/!(*.ts)",
+            "output": "./"
+          },
+          {
+            "input": "./packages/openapi-generator/src",
+            "glob": "**/*.d.ts",
+            "output": "./"
+          },
+          {
+            "input": "./packages/openapi-generator",
+            "glob": "generators.json",
+            "output": "."
+          }
+        ]
+      }
+    }
+  },
+  "tags": []
+}
