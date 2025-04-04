@@ -9,7 +9,14 @@
 ## To run the plugin
 
 ```bash
+# run the generator to generate a package
 npx nx run @test-plugin/nx-plugin:build && nx g @test-plugin/nx-plugin:openapi-client pokemon-api --directory ./packages --scope @test-api --client @hey-api/client-fetch --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml --plugins @tanstack/react-query  --verbose
+
+# symlinks the new package into node_modules
+npm install
+
+# runs the executor to update the generated package
+npx nx run @test-api/pokemon-api:updateApi
 ```
 
 ## Run tasks
