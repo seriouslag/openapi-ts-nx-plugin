@@ -87,16 +87,38 @@ const getClientPlugins = ({
   // Filter the plugins that are in the inputPlugins array
   const filteredPlugins = Object.keys(plugins)
     .filter((plugin) => inputPlugins.includes(plugin))
-    .reduce(
-      (acc, plugin) => {
-        const keyedPlugin = plugin as keyof typeof plugins;
-        acc[plugin] = plugins[keyedPlugin]!;
-        return acc;
-      },
-      {} as Record<string, ClientPluginOptions>,
-    );
+    .reduce((acc, plugin) => {
+      const keyedPlugin = plugin as keyof typeof plugins;
+      acc[plugin] = plugins[keyedPlugin]!;
+      return acc;
+    }, {} as Record<string, ClientPluginOptions>);
 
   return filteredPlugins;
+};
+
+// add additional test runners to support here
+/**
+ * The test runner to use
+ */
+export type TestRunner = 'vitest';
+
+/**
+ * The test runners and their configurations for generating test files
+ */
+const testRunners: Record<
+  TestRunner,
+  {
+    addToTsConfigIncludes?: string[];
+    /**
+     * The template path to the test files
+     */
+    templatePath: string;
+  }
+> = {
+  vitest: {
+    addToTsConfigIncludes: ['vite.config.ts'],
+    templatePath: './tests/vitest',
+  },
 };
 
 export interface OpenApiClientGeneratorSchema {
@@ -106,12 +128,13 @@ export interface OpenApiClientGeneratorSchema {
   plugins: string[];
   scope: string;
   spec: string;
-  tags?: string;
+  tags?: string[];
+  test?: TestRunner | 'none';
 }
 
 export default async function (
   tree: Tree,
-  options: OpenApiClientGeneratorSchema,
+  options: OpenApiClientGeneratorSchema
 ) {
   const normalizedOptions = normalizeOptions(options);
   const {
@@ -187,21 +210,21 @@ export interface NormalizedOptions {
   projectScope: string;
   specFile: string;
   tagArray: string[];
+  test: TestRunner | 'none';
 }
 
 /**
  * Normalizes the CLI input options
  */
 export function normalizeOptions(
-  options: OpenApiClientGeneratorSchema,
+  options: OpenApiClientGeneratorSchema
 ): NormalizedOptions {
   const name = names(options.name).fileName;
   const projectDirectory = names(options.directory).fileName.replace('./', '');
   const projectName = name.replace(new RegExp('/', 'g'), '-');
+  logger.info(`Project name: ${options.tags}`);
   const projectRoot = `${projectDirectory}/${projectName}`;
-  const tagArray = options.tags
-    ? options.tags.split(',').map((s) => s.trim())
-    : ['api', 'openapi'];
+  const tagArray = (options.tags ?? []).map((s) => s.trim());
 
   return {
     clientType: options.client,
@@ -212,6 +235,7 @@ export function normalizeOptions(
     projectScope: options.scope,
     specFile: options.spec,
     tagArray,
+    test: options.test ?? 'none',
   };
 }
 
@@ -236,6 +260,7 @@ export function generateNxProject({
     projectScope,
     specFile,
     tagArray,
+    test,
   } = normalizedOptions;
 
   const updateOptions: UpdateApiExecutorSchema = {
@@ -252,7 +277,7 @@ export function generateNxProject({
   for (const plugin of plugins) {
     if (clientPlugins[plugin]) {
       additionalEntryPoints.push(
-        ...(clientPlugins[plugin].additionalEntryPoints || []),
+        ...(clientPlugins[plugin].additionalEntryPoints || [])
       );
     }
   }
@@ -301,24 +326,23 @@ export function generateNxProject({
     },
   });
 
+  const generatedOptions = {
+    ...normalizedOptions,
+    ...CONSTANTS,
+  };
+
   // Create directory structure
   const templatePath = join(__dirname, 'files');
-  generateFiles(tree, templatePath, projectRoot, {
-    ...normalizedOptions,
-    clientType,
-  });
+  generateFiles(tree, templatePath, projectRoot, generatedOptions);
 
   for (const plugin of plugins) {
     if (clientPlugins[plugin]) {
       if (clientPlugins[plugin].templateFilesPath) {
         const pluginTemplatePath = join(
           __dirname,
-          clientPlugins[plugin].templateFilesPath,
+          clientPlugins[plugin].templateFilesPath
         );
-        generateFiles(tree, pluginTemplatePath, projectRoot, {
-          ...normalizedOptions,
-          clientType,
-        });
+        generateFiles(tree, pluginTemplatePath, projectRoot, generatedOptions);
       }
 
       const packageJsonExports = clientPlugins[plugin].packageJsonExports;
@@ -330,6 +354,32 @@ export function generateNxProject({
           };
           return json;
         });
+      }
+
+      // Generate the test files
+      if (test !== 'none') {
+        const { addToTsConfigIncludes, templatePath } = testRunners[test];
+        generateFiles(
+          tree,
+          join(__dirname, templatePath),
+          projectRoot,
+          generatedOptions
+        );
+        if (addToTsConfigIncludes?.length) {
+          updateJson(
+            tree,
+            `${projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`,
+            (json) => {
+              for (const include of addToTsConfigIncludes) {
+                // use a set to avoid duplicates
+                const setOfIncludes = new Set(json.include);
+                setOfIncludes.add(include);
+                json.include = Array.from(setOfIncludes);
+              }
+              return json;
+            }
+          );
+        }
       }
     }
   }
@@ -353,12 +403,12 @@ export async function generateApi({
   // Determine spec file paths
   const specDestination = joinPathFragments(
     apiDirectory,
-    CONSTANTS.SPEC_FILE_NAME,
+    CONSTANTS.SPEC_FILE_NAME
   );
   const tempSpecDestination = joinPathFragments(
     tempFolder,
     CONSTANTS.SPEC_DIR_NAME,
-    CONSTANTS.SPEC_FILE_NAME,
+    CONSTANTS.SPEC_FILE_NAME
   );
 
   try {
@@ -379,7 +429,7 @@ export async function generateApi({
         `npx redocly bundle ${specFile} --output ${tempSpecDestination} --ext yaml --dereferenced`,
         {
           stdio: 'inherit',
-        },
+        }
       );
       logger.info(`OpenAPI spec file bundled successfully.`);
 
@@ -426,7 +476,7 @@ export async function updatePackageJson({
     getVersionOfPackage(clientType) || `^${await latestVersion(packageName)}`;
 
   const latestOpenApiTsVersion = `^${await latestVersion(
-    '@hey-api/openapi-ts',
+    '@hey-api/openapi-ts'
   )}`;
 
   // Update package.json to add dependencies and scripts
@@ -444,7 +494,7 @@ export async function updatePackageJson({
     tree,
     deps,
     {},
-    join(projectRoot, 'package.json'),
+    join(projectRoot, 'package.json')
   );
 
   const tsconfigName = 'tsconfig.base.json';
