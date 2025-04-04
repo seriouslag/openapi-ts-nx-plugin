@@ -4,7 +4,7 @@ import { nxCopyAssetsPlugin } from '@nx/vite/plugins/nx-copy-assets.plugin';
 
 export default defineConfig(() => ({
   root: __dirname,
-  cacheDir: '../../node_modules/.vite/tools/openapi-generator',
+  cacheDir: '../../node_modules/.vite/tools/nx-plugin',
   plugins: [nxViteTsPaths(), nxCopyAssetsPlugin(['*.md'])],
   test: {
     watch: false,
@@ -13,7 +13,7 @@ export default defineConfig(() => ({
     include: ['src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
     reporters: ['default'],
     coverage: {
-      reportsDirectory: '../../coverage/tools/openapi-generator',
+      reportsDirectory: '../../coverage/tools/nx-plugin',
       provider: 'v8' as const,
     },
   },

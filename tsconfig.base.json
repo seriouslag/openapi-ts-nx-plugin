@@ -14,12 +14,10 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "skipLibCheck": true,
+    "resolveJsonModule": true,
     "strict": true,
     "target": "es2022",
     "customConditions": ["development"],
-    "paths": {
-      "@test-api/stripe-api": ["./packages/stripe-api/stripe-api/src/index.ts"],
-      "@test-api/stripe-api/rq": ["./packages/stripe-api/stripe-api/src/rq.ts"]
-    }
+    "paths": {}
   }
 }

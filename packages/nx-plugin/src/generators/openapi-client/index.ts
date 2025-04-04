@@ -1,37 +1,132 @@
+import type { Tree } from '@nx/devkit';
 import {
-  Tree,
-  formatFiles,
-  installPackagesTask,
-  names,
-  generateFiles,
-  joinPathFragments,
+  addDependenciesToPackageJson,
   addProjectConfiguration,
-  updateJson,
+  formatFiles,
+  generateFiles,
+  installPackagesTask,
+  joinPathFragments,
   logger,
+  names,
+  updateJson,
   workspaceRoot,
 } from '@nx/devkit';
-import { join, resolve } from 'path';
 import { execSync } from 'child_process';
-import { mkdir, readFile, rm } from 'fs/promises';
 import { existsSync } from 'fs';
+import { mkdir, readFile, rm } from 'fs/promises';
+import { join } from 'path';
+
+import packageJson from '../../../package.json';
+import type { UpdateApiExecutorSchema } from '../../executors/update-api/schema';
+import {
+  generateClientCode,
+  generateClientCommand,
+  getPackageName,
+  getVersionOfPackage,
+} from '../../utils';
+import { CONSTANTS } from '../../vars';
 
 const tempFolder = join(process.cwd(), 'tmp');
 
-export type OpenApiClientType = 'fetch' | 'axios';
+/**
+ * Plugin configuration for the OpenAPI client generator
+ */
+export type ClientPluginOptions = {
+  /**
+   * Additional entry points to be added for this plugin to the tsconfig.base.json file
+   */
+  additionalEntryPoints?: string[];
+  /**
+   * Package.json exports to be added for this plugin to the package.json file
+   */
+  packageJsonExports?: Record<
+    string,
+    {
+      default: string;
+      development: string;
+      import: string;
+      types: string;
+    }
+  >;
+  /**
+   * Path to the template files to be added for this plugin to the project
+   */
+  templateFilesPath?: string;
+  /**
+   * Compiler paths to be added for this plugin to the tsconfig.base.json file
+   */
+  tsConfigCompilerPaths?: Record<string, string>;
+};
+
+const getClientPlugins = ({
+  inputPlugins,
+  projectName,
+  projectRoot,
+  projectScope,
+}: NormalizedOptions & {
+  inputPlugins: string[];
+}): Record<string, ClientPluginOptions> => {
+  const plugins: Record<string, ClientPluginOptions> = {
+    '@tanstack/react-query': {
+      additionalEntryPoints: [`${projectRoot}/src/rq.ts`],
+      packageJsonExports: {
+        './rq': {
+          default: './dist/rq.js',
+          development: './src/rq.ts',
+          import: './dist/rq.js',
+          types: './dist/rq.d.ts',
+        },
+      },
+      templateFilesPath: './plugins/rq',
+      tsConfigCompilerPaths: {
+        [`${projectScope}/${projectName}/rq`]: `./${projectRoot}/src/rq.ts`,
+      },
+    },
+  };
+
+  // Filter the plugins that are in the inputPlugins array
+  const filteredPlugins = Object.keys(plugins)
+    .filter((plugin) => inputPlugins.includes(plugin))
+    .reduce(
+      (acc, plugin) => {
+        const keyedPlugin = plugin as keyof typeof plugins;
+        acc[plugin] = plugins[keyedPlugin]!;
+        return acc;
+      },
+      {} as Record<string, ClientPluginOptions>,
+    );
+
+  return filteredPlugins;
+};
 
 export interface OpenApiClientGeneratorSchema {
+  client: string;
+  directory: string;
   name: string;
-  directory?: string;
-  spec: string;
+  plugins: string[];
   scope: string;
+  spec: string;
   tags?: string;
-  client: OpenApiClientType;
 }
 
-export default async function (tree: Tree, options: OpenApiClientGeneratorSchema) {
+export default async function (
+  tree: Tree,
+  options: OpenApiClientGeneratorSchema,
+) {
   const normalizedOptions = normalizeOptions(options);
-  const { projectRoot, projectName, clientType, specFile, projectScope, projectDirectory } =
-    normalizedOptions;
+  const {
+    clientType,
+    plugins,
+    projectName,
+    projectRoot,
+    projectScope,
+    specFile,
+  } = normalizedOptions;
+
+  const clientPlugins = getClientPlugins({
+    ...normalizedOptions,
+    inputPlugins: plugins,
+  });
 
   // Create the temp folder
   if (!existsSync(tempFolder)) {
@@ -40,54 +135,58 @@ export default async function (tree: Tree, options: OpenApiClientGeneratorSchema
 
   // Generate the Nx project
   generateNxProject({
-    tree,
+    clientPlugins,
     normalizedOptions,
+    tree,
   });
 
   // Generate the api client code
   await generateApi({
-    tree,
-    specFile,
     projectRoot,
+    specFile,
+    tree,
   });
 
   // Update the package.json file
-  updatePackageJson({
-    tree,
-    projectRoot,
-    projectName,
-    projectScope,
-    projectDirectory,
+  const installDeps = await updatePackageJson({
+    clientPlugins,
     clientType,
+    projectName,
+    projectRoot,
+    projectScope,
+    tree,
   });
 
   // Generate the client code
   generateClientCode({
-    projectRoot,
     clientType,
+    outputPath: `${projectRoot}/src/generated`,
+    plugins,
+    specFile: `${tempFolder}/api/spec.yaml`,
   });
 
   // Format the files
   await formatFiles(tree);
 
   // Remove the temp folder
-  await rm(tempFolder, { recursive: true, force: true });
+  await rm(tempFolder, { force: true, recursive: true });
 
   // Return a function that installs the packages
-  return () => {
+  return async () => {
+    await installDeps();
     installPackagesTask(tree);
   };
 }
 
-
 export interface NormalizedOptions {
+  clientType: string;
+  plugins: string[];
+  projectDirectory: string;
   projectName: string;
   projectRoot: string;
-  projectDirectory: string;
   projectScope: string;
-  tagArray: string[];
-  clientType: OpenApiClientType;
   specFile: string;
+  tagArray: string[];
 }
 
 /**
@@ -97,22 +196,21 @@ export function normalizeOptions(
   options: OpenApiClientGeneratorSchema,
 ): NormalizedOptions {
   const name = names(options.name).fileName;
-  const projectDirectory = options.directory
-    ? `${names(options.directory).fileName}/${name}`
-    : name;
+  const projectDirectory = names(options.directory).fileName.replace('./', '');
   const projectName = name.replace(new RegExp('/', 'g'), '-');
-  const projectRoot = `${projectDirectory}`;
+  const projectRoot = `${projectDirectory}/${projectName}`;
   const tagArray = options.tags
     ? options.tags.split(',').map((s) => s.trim())
     : ['api', 'openapi'];
 
   return {
-    projectScope: options.scope,
     clientType: options.client,
-    specFile: options.spec,
+    plugins: options.plugins,
+    projectDirectory,
     projectName,
     projectRoot,
-    projectDirectory,
+    projectScope: options.scope,
+    specFile: options.spec,
     tagArray,
   };
 }
@@ -121,90 +219,147 @@ export function normalizeOptions(
  * Generates the nx project
  */
 export function generateNxProject({
-  tree,
+  clientPlugins,
   normalizedOptions,
+  tree,
 }: {
-  tree: Tree;
+  clientPlugins: Record<string, ClientPluginOptions>;
   normalizedOptions: NormalizedOptions;
+  tree: Tree;
 }) {
-  const { projectName, projectRoot, tagArray, clientType } = normalizedOptions;
-  // Create basic project structure
-  addProjectConfiguration(
-    tree,
+  const {
+    clientType,
+    plugins,
+    projectDirectory,
     projectName,
-    {
-      root: projectRoot,
-      projectType: 'library',
-      sourceRoot: `${projectRoot}/src`,
-      targets: {
-        build: {
-          executor: '@nx/js:tsc',
-          outputs: ['{options.outputPath}'],
-          options: {
-            outputPath: `dist/${projectRoot}`,
-            tsConfig: `${projectRoot}/tsconfig.lib.json`,
-            main: `${projectRoot}/src/index.ts`,
-            additionalEntryPoints: [
-              `${projectRoot}/src/rq.ts`,
-            ],
-            assets: [
-              {
-                glob: 'README.md',
-                input: `./${projectRoot}`,
-                output: '.',
-              },
-            ],
-          },
+    projectRoot,
+    projectScope,
+    specFile,
+    tagArray,
+  } = normalizedOptions;
+
+  const updateOptions: UpdateApiExecutorSchema = {
+    client: clientType,
+    directory: projectDirectory,
+    name: projectName,
+    plugins,
+    scope: projectScope,
+    spec: specFile,
+  };
+
+  const additionalEntryPoints: string[] = [];
+
+  for (const plugin of plugins) {
+    if (clientPlugins[plugin]) {
+      additionalEntryPoints.push(
+        ...(clientPlugins[plugin].additionalEntryPoints || []),
+      );
+    }
+  }
+
+  // Create basic project structure
+  addProjectConfiguration(tree, `${projectScope}/${projectName}`, {
+    projectType: 'library',
+    root: projectRoot,
+    sourceRoot: `${projectRoot}/src`,
+    tags: tagArray,
+    targets: {
+      build: {
+        executor: '@nx/js:tsc',
+        options: {
+          additionalEntryPoints,
+          assets: [
+            {
+              glob: 'README.md',
+              input: `./${projectRoot}`,
+              output: '.',
+            },
+          ],
+          main: `${projectRoot}/src/index.ts`,
+          outputPath: `${projectRoot}/dist`,
+          rootDir: `${projectRoot}/src`,
+          tsConfig: `${projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`,
         },
-        lint: {
-          executor: '@nx/eslint:lint',
-          options: {
-            lintFilePatterns: [
-              `${projectRoot}/**/*.ts`,
-              `${projectRoot}/package.json`,
-            ],
-          },
-        },
-        generateApi: {
-          executor: 'nx:run-commands',
-          options: {
-            cwd: projectRoot,
-            command: `npx @hey-api/openapi-ts -i ./api/spec.yaml -o ./src/generated -c @hey-api/client-${clientType} -p @tanstack/react-query`,
-          },
+        outputs: ['{options.outputPath}'],
+      },
+      generateApi: {
+        executor: 'nx:run-commands',
+        options: {
+          command: generateClientCommand({
+            clientType,
+            outputPath: `./src/${CONSTANTS.GENERATED_DIR_NAME}`,
+            plugins,
+            specFile: `./${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`,
+          }),
+          cwd: projectRoot,
         },
       },
-      tags: tagArray,
-
+      updateApi: {
+        executor: `${packageJson.name}:update-api`,
+        options: updateOptions,
+      },
     },
-    false,
-  );
+  });
 
   // Create directory structure
   const templatePath = join(__dirname, 'files');
   generateFiles(tree, templatePath, projectRoot, {
     ...normalizedOptions,
-    clientType: `@hey-api/client-${clientType}`,
+    clientType,
   });
+
+  for (const plugin of plugins) {
+    if (clientPlugins[plugin]) {
+      if (clientPlugins[plugin].templateFilesPath) {
+        const pluginTemplatePath = join(
+          __dirname,
+          clientPlugins[plugin].templateFilesPath,
+        );
+        generateFiles(tree, pluginTemplatePath, projectRoot, {
+          ...normalizedOptions,
+          clientType,
+        });
+      }
+
+      const packageJsonExports = clientPlugins[plugin].packageJsonExports;
+      if (packageJsonExports) {
+        updateJson(tree, `${projectRoot}/package.json`, (json) => {
+          json.exports = {
+            ...json.exports,
+            ...packageJsonExports,
+          };
+          return json;
+        });
+      }
+    }
+  }
 }
 
 /**
  * Generates the api client code using the spec file
  */
 export async function generateApi({
-  tree,
-  specFile,
   projectRoot,
+  specFile,
+  tree,
 }: {
-  tree: Tree;
   projectRoot: string;
   specFile: string;
+  tree: Tree;
 }) {
   // Create api directory if it doesn't exist
-  const apiDirectory = joinPathFragments(projectRoot, 'api');
+  const apiDirectory = joinPathFragments(projectRoot, CONSTANTS.SPEC_DIR_NAME);
 
   // Determine spec file paths
-  const specDestination = joinPathFragments(apiDirectory, 'spec.yaml');
-  const tempSpecDestination = joinPathFragments(tempFolder, 'api', 'spec.yaml');
+  const specDestination = joinPathFragments(
+    apiDirectory,
+    CONSTANTS.SPEC_FILE_NAME,
+  );
+  const tempSpecDestination = joinPathFragments(
+    tempFolder,
+    CONSTANTS.SPEC_DIR_NAME,
+    CONSTANTS.SPEC_FILE_NAME,
+  );
 
   try {
     // Create a full file path for the temporary and final spec files
@@ -250,86 +405,73 @@ export async function generateApi({
 /**
  * Updates the package.json file to add dependencies and scripts
  */
-export function updatePackageJson({
-  tree,
-  projectRoot,
-  projectName,
-  projectScope,
-  projectDirectory,
+export async function updatePackageJson({
+  clientPlugins,
   clientType,
+  projectName,
+  projectRoot,
+  projectScope,
+  tree,
 }: {
-  tree: Tree;
-  projectRoot: string;
+  clientPlugins: Record<string, ClientPluginOptions>;
+  clientType: string;
   projectName: string;
+  projectRoot: string;
   projectScope: string;
-  projectDirectory: string;
-  clientType: OpenApiClientType;
+  tree: Tree;
 }) {
+  const { default: latestVersion } = await import('latest-version');
+  const packageName = getPackageName(clientType);
+  const packageVersion =
+    getVersionOfPackage(clientType) || `^${await latestVersion(packageName)}`;
+
+  const latestOpenApiTsVersion = `^${await latestVersion(
+    '@hey-api/openapi-ts',
+  )}`;
+
   // Update package.json to add dependencies and scripts
-  if (tree.exists(`${projectRoot}/package.json`)) {
-    updateJson(tree, `${projectRoot}/package.json`, (json) => {
-      json.scripts = {
-        ...json.scripts,
-        generate: 'nx run ' + projectName + ':generateApi',
-      };
+  const deps: Record<string, string> = {
+    '@hey-api/openapi-ts': latestOpenApiTsVersion,
+    [packageName]: packageVersion,
+  };
 
-      // Add the required dependencies
-      json.dependencies = json.dependencies || {};
-      json.devDependencies = json.devDependencies || {};
-
-      // Add the client dependency
-      if (clientType === 'fetch') {
-        json.dependencies['@hey-api/client-fetch'] = '^0.9.0';
-      } else if (clientType === 'axios') {
-        json.dependencies['@hey-api/client-axios'] = '^0.7.0';
-        json.dependencies['axios'] = '^1.6.0';
-      }
-
-      // Add dev dependency for the generator
-      json.devDependencies['@hey-api/openapi-ts'] = '^0.66.0';
-
-      return json;
-    });
+  if (packageName === '@hey-api/client-axios') {
+    const axiosVersion = await latestVersion('axios');
+    deps['axios'] = `^${axiosVersion}`;
   }
 
-  const tsConfigPath = join(workspaceRoot, 'tsconfig.base.json');
+  const installDeps = addDependenciesToPackageJson(
+    tree,
+    deps,
+    {},
+    join(projectRoot, 'package.json'),
+  );
+
+  const tsconfigName = 'tsconfig.base.json';
+  const tsConfigPath = join(workspaceRoot, tsconfigName);
   if (existsSync(tsConfigPath)) {
-    updateJson(tree, 'tsconfig.base.json', (json) => {
+    updateJson(tree, tsconfigName, (json) => {
       const paths = json.compilerOptions.paths || {};
       paths[`${projectScope}/${projectName}`] = [
-        `${projectDirectory}/${projectName}/src/index.ts`,
+        `./${projectRoot}/src/index.ts`,
       ];
-      paths[`${projectScope}/${projectName}/rq`] = [
-        `${projectDirectory}/${projectName}/src/rq.ts`,
-      ];
+      for (const plugin of Object.keys(clientPlugins)) {
+        const item = clientPlugins[plugin]!;
+        const pluginTsConfigPath = item.tsConfigCompilerPaths;
+        if (pluginTsConfigPath) {
+          // for each key in the pluginTsConfigPath object, add it to the paths object
+          for (const [key, value] of Object.entries(pluginTsConfigPath)) {
+            paths[key] = [value];
+          }
+        }
+      }
       json.compilerOptions.paths = paths;
       return json;
     });
   } else {
-    logger.error(`Failed to find tsconfig.base.json file in ${workspaceRoot}`);
+    logger.error(`Failed to find ${tsconfigName} file in ${workspaceRoot}.`);
+    throw new Error(`Failed to find ${tsconfigName} file in ${workspaceRoot}.`);
   }
-}
 
-/**
- * Generates the client code using the spec file
- */
-export function generateClientCode({
-  projectRoot,
-  clientType,
-}: {
-  projectRoot: string;
-  clientType: OpenApiClientType;
-}) {
-  // Bundle the spec file using Redocly CLI
-  logger.info(`Generating client code using spec file...`);
-
-  logger.info(`Project root: ${resolve(projectRoot)}`);
-  // Copy bundled and dereferenced spec file to project
-  execSync(
-    `npx @hey-api/openapi-ts -i ${tempFolder}/api/spec.yaml -o ${projectRoot}/src/generated -c @hey-api/client-${clientType} -p @tanstack/react-query`,
-    {
-      stdio: 'inherit',
-    },
-  );
-  logger.info(`Generated client code successfully.`);
+  return installDeps;
 }

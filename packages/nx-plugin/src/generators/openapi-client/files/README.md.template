@@ -30,10 +30,7 @@ If the API specification changes, you can regenerate the client:
 
 ```bash
 # From the project root
-nx run <%= projectName %>:generateApi
-
-# Or using the npm script
-npm run generate
+nx run <%= projectScope %>/<%= projectName %>:updateApi
 ```
 
 ## License

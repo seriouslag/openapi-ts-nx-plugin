@@ -1,5 +1,5 @@
 {
-  "name": "@cash-standalone/<%= projectName %>",
+  "name": "<%= projectScope %>/<%= projectName %>",
   "version": "0.1.0",
   "type": "commonjs",
   "exports": {
@@ -9,15 +9,9 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    },
-    "./rq": {
-      "development": "./src/rq.ts",
-      "types": "./dist/rq.d.ts",
-      "import": "./dist/rq.js",
-      "default": "./dist/rq.js"
-    },
+    }
   },
   "scripts": {
-    "generate": "nx run <%= projectName %>:generateApi"
+    "update": "nx run <%= projectScope %>/<%= projectName %>:updateApi"
   }
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@test-plugin/nx-plugin",
+  "name": "openapi-generator",
   "version": "0.0.1",
   "generators": {
     "openapi-client": {
