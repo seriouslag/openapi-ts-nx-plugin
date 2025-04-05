@@ -9,7 +9,6 @@ import {
   logger,
   names,
   updateJson,
-  workspaceRoot,
 } from '@nx/devkit';
 import { execSync } from 'child_process';
 import { existsSync } from 'fs';
@@ -26,7 +25,7 @@ import {
 } from '../../utils';
 import { CONSTANTS } from '../../vars';
 
-const tempFolder = join(process.cwd(), 'tmp');
+const defaultTempFolder = join(process.cwd(), CONSTANTS.TMP_DIR_NAME);
 
 /**
  * Plugin configuration for the OpenAPI client generator
@@ -87,11 +86,14 @@ const getClientPlugins = ({
   // Filter the plugins that are in the inputPlugins array
   const filteredPlugins = Object.keys(plugins)
     .filter((plugin) => inputPlugins.includes(plugin))
-    .reduce((acc, plugin) => {
-      const keyedPlugin = plugin as keyof typeof plugins;
-      acc[plugin] = plugins[keyedPlugin]!;
-      return acc;
-    }, {} as Record<string, ClientPluginOptions>);
+    .reduce(
+      (acc, plugin) => {
+        const keyedPlugin = plugin as keyof typeof plugins;
+        acc[plugin] = plugins[keyedPlugin]!;
+        return acc;
+      },
+      {} as Record<string, ClientPluginOptions>,
+    );
 
   return filteredPlugins;
 };
@@ -122,19 +124,48 @@ const testRunners: Record<
 };
 
 export interface OpenApiClientGeneratorSchema {
+  /**
+   * The client to use for the OpenAPI client
+   */
   client: string;
+  /**
+   * The directory to use for the project
+   */
   directory: string;
+  /**
+   * The name of the project
+   */
   name: string;
+  /**
+   * The plugins to use for the OpenAPI client
+   */
   plugins: string[];
+  /**
+   * The scope of the project
+   */
   scope: string;
+  /**
+   * The spec file to use for the OpenAPI client
+   */
   spec: string;
+  /**
+   * The tags to use for the project
+   */
   tags?: string[];
+  /**
+   * The directory to use for the temp folder, defaults to `./tmp`
+   * Only used for testing purposes
+   */
+  tempFolderDir?: string;
+  /**
+   * The test runner to use for the project, defaults to `none`
+   */
   test?: TestRunner | 'none';
 }
 
 export default async function (
   tree: Tree,
-  options: OpenApiClientGeneratorSchema
+  options: OpenApiClientGeneratorSchema,
 ) {
   const normalizedOptions = normalizeOptions(options);
   const {
@@ -144,6 +175,7 @@ export default async function (
     projectRoot,
     projectScope,
     specFile,
+    tempFolder,
   } = normalizedOptions;
 
   const clientPlugins = getClientPlugins({
@@ -167,13 +199,20 @@ export default async function (
   await generateApi({
     projectRoot,
     specFile,
+    tempFolder,
     tree,
   });
 
   // Update the package.json file
   const installDeps = await updatePackageJson({
-    clientPlugins,
     clientType,
+    projectRoot,
+    tree,
+  });
+
+  // Update the tsconfig.base.json file
+  updateTsConfig({
+    clientPlugins,
     projectName,
     projectRoot,
     projectScope,
@@ -181,18 +220,20 @@ export default async function (
   });
 
   // Generate the client code
-  generateClientCode({
+  await generateClientCode({
     clientType,
-    outputPath: `${projectRoot}/src/generated`,
+    outputPath: `${projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
     plugins,
-    specFile: `${tempFolder}/api/spec.yaml`,
+    specFile: `${tempFolder}/${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`,
   });
 
   // Format the files
   await formatFiles(tree);
 
   // Remove the temp folder
-  await rm(tempFolder, { force: true, recursive: true });
+  const absoluteTempFolder = join(process.cwd(), tempFolder);
+  logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
+  await rm(absoluteTempFolder, { force: true, recursive: true });
 
   // Return a function that installs the packages
   return async () => {
@@ -210,14 +251,17 @@ export interface NormalizedOptions {
   projectScope: string;
   specFile: string;
   tagArray: string[];
+  tempFolder: string;
   test: TestRunner | 'none';
 }
+
+export type GeneratedOptions = NormalizedOptions & typeof CONSTANTS;
 
 /**
  * Normalizes the CLI input options
  */
 export function normalizeOptions(
-  options: OpenApiClientGeneratorSchema
+  options: OpenApiClientGeneratorSchema,
 ): NormalizedOptions {
   const name = names(options.name).fileName;
   const projectDirectory = names(options.directory).fileName.replace('./', '');
@@ -225,6 +269,8 @@ export function normalizeOptions(
   logger.info(`Project name: ${options.tags}`);
   const projectRoot = `${projectDirectory}/${projectName}`;
   const tagArray = (options.tags ?? []).map((s) => s.trim());
+
+  const tempFolder = options.tempFolderDir ?? defaultTempFolder;
 
   return {
     clientType: options.client,
@@ -235,6 +281,7 @@ export function normalizeOptions(
     projectScope: options.scope,
     specFile: options.spec,
     tagArray,
+    tempFolder,
     test: options.test ?? 'none',
   };
 }
@@ -275,10 +322,9 @@ export function generateNxProject({
   const additionalEntryPoints: string[] = [];
 
   for (const plugin of plugins) {
-    if (clientPlugins[plugin]) {
-      additionalEntryPoints.push(
-        ...(clientPlugins[plugin].additionalEntryPoints || [])
-      );
+    const clientPlugin = clientPlugins[plugin];
+    if (clientPlugin) {
+      additionalEntryPoints.push(...(clientPlugin.additionalEntryPoints ?? []));
     }
   }
 
@@ -319,6 +365,7 @@ export function generateNxProject({
           cwd: projectRoot,
         },
       },
+      // this adds the update-api executor to the generated project
       updateApi: {
         executor: `${packageJson.name}:update-api`,
         options: updateOptions,
@@ -326,7 +373,7 @@ export function generateNxProject({
     },
   });
 
-  const generatedOptions = {
+  const generatedOptions: GeneratedOptions = {
     ...normalizedOptions,
     ...CONSTANTS,
   };
@@ -336,52 +383,85 @@ export function generateNxProject({
   generateFiles(tree, templatePath, projectRoot, generatedOptions);
 
   for (const plugin of plugins) {
-    if (clientPlugins[plugin]) {
-      if (clientPlugins[plugin].templateFilesPath) {
-        const pluginTemplatePath = join(
-          __dirname,
-          clientPlugins[plugin].templateFilesPath
-        );
-        generateFiles(tree, pluginTemplatePath, projectRoot, generatedOptions);
-      }
-
-      const packageJsonExports = clientPlugins[plugin].packageJsonExports;
-      if (packageJsonExports) {
-        updateJson(tree, `${projectRoot}/package.json`, (json) => {
-          json.exports = {
-            ...json.exports,
-            ...packageJsonExports,
-          };
-          return json;
-        });
-      }
-
-      // Generate the test files
-      if (test !== 'none') {
-        const { addToTsConfigIncludes, templatePath } = testRunners[test];
-        generateFiles(
-          tree,
-          join(__dirname, templatePath),
-          projectRoot,
-          generatedOptions
-        );
-        if (addToTsConfigIncludes?.length) {
-          updateJson(
-            tree,
-            `${projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`,
-            (json) => {
-              for (const include of addToTsConfigIncludes) {
-                // use a set to avoid duplicates
-                const setOfIncludes = new Set(json.include);
-                setOfIncludes.add(include);
-                json.include = Array.from(setOfIncludes);
-              }
-              return json;
-            }
-          );
-        }
-      }
+    const pluginConfig = clientPlugins[plugin];
+    if (pluginConfig) {
+      handlePlugin({
+        generatedOptions,
+        plugin: pluginConfig,
+        projectRoot,
+        tree,
+      });
     }
+  }
+
+  // Generate the test files
+  if (test !== 'none') {
+    generateTestFiles({
+      generatedOptions,
+      projectRoot,
+      test,
+      tree,
+    });
+  }
+}
+
+function handlePlugin({
+  generatedOptions,
+  plugin,
+  projectRoot,
+  tree,
+}: {
+  generatedOptions: GeneratedOptions;
+  plugin: ClientPluginOptions;
+  projectRoot: string;
+  tree: Tree;
+}) {
+  if (plugin.templateFilesPath) {
+    const pluginTemplatePath = join(__dirname, plugin.templateFilesPath);
+    generateFiles(tree, pluginTemplatePath, projectRoot, generatedOptions);
+  }
+
+  const packageJsonExports = plugin.packageJsonExports;
+  if (packageJsonExports) {
+    updateJson(tree, `${projectRoot}/package.json`, (json) => {
+      json.exports = {
+        ...json.exports,
+        ...packageJsonExports,
+      };
+      return json;
+    });
+  }
+}
+
+export function generateTestFiles({
+  generatedOptions,
+  projectRoot,
+  test,
+  tree,
+}: {
+  generatedOptions: GeneratedOptions;
+  projectRoot: string;
+  test: TestRunner;
+  tree: Tree;
+}) {
+  const { addToTsConfigIncludes, templatePath } = testRunners[test];
+  generateFiles(
+    tree,
+    join(__dirname, templatePath),
+    projectRoot,
+    generatedOptions,
+  );
+  if (addToTsConfigIncludes?.length) {
+    updateJson(
+      tree,
+      `${projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`,
+      (json) => {
+        const setOfIncludes = new Set<string>(json.include ?? []);
+        addToTsConfigIncludes.forEach((include) => setOfIncludes.add(include));
+        json.include = Array.from(setOfIncludes);
+        return json;
+      },
+    );
   }
 }
 
@@ -391,10 +471,12 @@ export function generateNxProject({
 export async function generateApi({
   projectRoot,
   specFile,
+  tempFolder,
   tree,
 }: {
   projectRoot: string;
   specFile: string;
+  tempFolder: string;
   tree: Tree;
 }) {
   // Create api directory if it doesn't exist
@@ -403,16 +485,19 @@ export async function generateApi({
   // Determine spec file paths
   const specDestination = joinPathFragments(
     apiDirectory,
-    CONSTANTS.SPEC_FILE_NAME
+    CONSTANTS.SPEC_FILE_NAME,
   );
+  // Create a full file path for the temp spec files
   const tempSpecDestination = joinPathFragments(
     tempFolder,
     CONSTANTS.SPEC_DIR_NAME,
-    CONSTANTS.SPEC_FILE_NAME
+    CONSTANTS.SPEC_FILE_NAME,
   );
 
+  logger.info(`Temp spec destination: ${tempSpecDestination}`);
+
   try {
-    // Create a full file path for the temporary and final spec files
+    // Create a full file path for the final spec files
     const workspacePath = process.cwd();
     const fullSpecPath = join(workspacePath, specDestination);
 
@@ -429,7 +514,7 @@ export async function generateApi({
         `npx redocly bundle ${specFile} --output ${tempSpecDestination} --ext yaml --dereferenced`,
         {
           stdio: 'inherit',
-        }
+        },
       );
       logger.info(`OpenAPI spec file bundled successfully.`);
 
@@ -456,18 +541,12 @@ export async function generateApi({
  * Updates the package.json file to add dependencies and scripts
  */
 export async function updatePackageJson({
-  clientPlugins,
   clientType,
-  projectName,
   projectRoot,
-  projectScope,
   tree,
 }: {
-  clientPlugins: Record<string, ClientPluginOptions>;
   clientType: string;
-  projectName: string;
   projectRoot: string;
-  projectScope: string;
   tree: Tree;
 }) {
   const { default: latestVersion } = await import('latest-version');
@@ -476,7 +555,7 @@ export async function updatePackageJson({
     getVersionOfPackage(clientType) || `^${await latestVersion(packageName)}`;
 
   const latestOpenApiTsVersion = `^${await latestVersion(
-    '@hey-api/openapi-ts'
+    '@hey-api/openapi-ts',
   )}`;
 
   // Update package.json to add dependencies and scripts
@@ -494,12 +573,27 @@ export async function updatePackageJson({
     tree,
     deps,
     {},
-    join(projectRoot, 'package.json')
+    join(projectRoot, 'package.json'),
   );
 
-  const tsconfigName = 'tsconfig.base.json';
-  const tsConfigPath = join(workspaceRoot, tsconfigName);
-  if (existsSync(tsConfigPath)) {
+  return installDeps;
+}
+
+export function updateTsConfig({
+  clientPlugins,
+  projectName,
+  projectRoot,
+  projectScope,
+  tree,
+}: {
+  clientPlugins: Record<string, ClientPluginOptions>;
+  projectName: string;
+  projectRoot: string;
+  projectScope: string;
+  tree: Tree;
+}) {
+  const tsconfigName = CONSTANTS.TS_BASE_CONFIG_NAME;
+  try {
     updateJson(tree, tsconfigName, (json) => {
       const paths = json.compilerOptions.paths || {};
       paths[`${projectScope}/${projectName}`] = [
@@ -518,10 +612,9 @@ export async function updatePackageJson({
       json.compilerOptions.paths = paths;
       return json;
     });
-  } else {
-    logger.error(`Failed to find ${tsconfigName} file in ${workspaceRoot}.`);
-    throw new Error(`Failed to find ${tsconfigName} file in ${workspaceRoot}.`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(`Failed to update ${tsconfigName}: ${errorMessage}`);
+    throw error;
   }
-
-  return installDeps;
 }
