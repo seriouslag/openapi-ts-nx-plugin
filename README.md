@@ -24,7 +24,7 @@ npx nx run @test-api/pokemon-api:updateApi
 
 # to test an update then make a change to one of the routes paths in the spec file located at ./packages/pokemon-api/src/spec.yaml
 # then run the executor again and you should see the update
-npx nx run @test-api/pokemon-api:updateApi
+npx nx run @test-api/pokemon-api:updateApi --skip-nx-cache --force
 ```
 
 ## Run tasks
