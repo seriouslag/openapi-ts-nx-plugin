@@ -27,6 +27,8 @@ npx nx run @test-api/pokemon-api:updateApi
 npx nx run @test-api/pokemon-api:updateApi --skip-nx-cache --force
 ```
 
+After running the generator you will see a new package in the packages folder named pokemon-api.
+
 ## Run tasks
 
 To run the dev server for your app, use:
