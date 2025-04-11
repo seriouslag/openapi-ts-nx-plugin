@@ -18,19 +18,9 @@
   "generators": "./generators.json",
   "executors": "./executors.json",
   "dependencies": {
-    "@apidevtools/swagger-parser": "10.1.1",
-    "@hey-api/openapi-ts": "0.66.2",
-    "@nx/devkit": "20.7.1",
-    "@redocly/cli": "1.34.1",
-    "nx": "20.7.1",
-    "latest-version": "9.0.0",
-    "openapi-diff": "0.23.7",
-    "tslib": "2.3.0"
+    "@hey-api/openapi-ts": "https://pkg.pr.new/hey-api/openapi-ts/@hey-api/openapi-ts@1934"
   },
-  "devDependencies": {
-    "typescript": "5.5.3",
-    "vitest": "1.6.0"
-  },
+  "devDependencies": {},
   "files": [
     "dist",
     "LICENSE.md",

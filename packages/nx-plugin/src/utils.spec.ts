@@ -1,6 +1,9 @@
-import { createClient } from '@hey-api/openapi-ts';
-import { execSync } from 'child_process';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { initConfigs } from '@hey-api/openapi-ts';
+import { createClient, getSpec } from '@hey-api/openapi-ts';
+import { randomUUID } from 'crypto';
+import { rm, writeFile } from 'fs/promises';
+import { join } from 'path';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   bundleAndDereferenceSpecFile,
@@ -8,23 +11,44 @@ import {
   generateClientCommand,
   getPackageName,
   getVersionOfPackage,
+  isAFile,
+  isUrl,
 } from './utils';
 
-// Mock execSync to prevent actual command execution
-vi.mock('child_process', () => ({
-  execSync: vi.fn(),
-}));
-
-vi.mock('@hey-api/openapi-ts', () => ({
-  createClient: vi.fn(),
-}));
+vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@hey-api/openapi-ts')>();
+  return {
+    ...actual,
+    createClient: vi.fn(),
+    getSpec: vi.fn(() =>
+      Promise.resolve({
+        data: {},
+        error: null,
+      }),
+    ),
+    initConfigs: vi.fn((config: Parameters<typeof initConfigs>[0]) =>
+      Promise.resolve([
+        {
+          input: config?.input ?? 'default-input',
+          output: config?.output ?? 'default-output',
+          plugins: config?.plugins ?? [],
+        },
+      ]),
+    ),
+    parseOpenApiSpec: vi.fn(() => ({
+      spec: {
+        name: 'test-name',
+      },
+    })),
+  };
+});
 
 describe('utils', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
+  afterAll(() => {
     vi.resetAllMocks();
   });
 
@@ -95,10 +119,6 @@ describe('utils', () => {
   });
 
   describe('generateClientCode', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
     it('should execute command successfully', async () => {
       await generateClientCode({
         clientType: '@hey-api/client-fetch',
@@ -119,45 +139,130 @@ describe('utils', () => {
         throw new Error('Command failed');
       });
 
-      await expect(
-        generateClientCode({
+      try {
+        await generateClientCode({
           clientType: '@hey-api/client-fetch',
           outputPath: './src/generated',
           plugins: [],
           specFile: './api/spec.yaml',
-        }),
-      ).rejects.toThrow('Command failed');
+        });
+        // If we get here, fail the test
+        expect.fail('Expected function to throw');
+      } catch (error) {
+        if (error instanceof Error) {
+          expect(error.message).toContain('Command failed');
+        } else {
+          expect.fail('Expected error to be an instance of Error');
+        }
+      }
     });
   });
 
   describe('bundleAndDereferenceSpecFile', () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    it('should execute bundle command successfully', () => {
-      bundleAndDereferenceSpecFile({
-        outputPath: './dist/spec.yaml',
-        specFile: './api/spec.yaml',
-      });
-
-      expect(execSync).toHaveBeenCalledWith(
-        'npx redocly bundle ./api/spec.yaml --output ./dist/spec.yaml --ext yaml --dereferenced',
-        { stdio: 'inherit' },
+    it('should execute bundle command successfully', async () => {
+      // write temp spec file
+      const specAsYaml = `openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      responses:
+        '200':
+          description: A successful response
+`;
+      const tempSpecFile = join(
+        process.cwd(),
+        `temp-spec-${randomUUID()}.yaml`,
       );
-    });
+      await writeFile(tempSpecFile, specAsYaml);
 
-    it('should throw error when bundle command fails', () => {
-      vi.mocked(execSync).mockImplementationOnce(() => {
-        throw new Error('Bundle failed');
+      const dereferencedSpec = await bundleAndDereferenceSpecFile({
+        client: '@hey-api/client-fetch',
+        outputPath: './output/dereferenced-spec.yaml',
+        plugins: [],
+        specPath: tempSpecFile,
       });
 
-      expect(() =>
+      expect(dereferencedSpec).toBeDefined();
+      expect((dereferencedSpec as any).name).toBe('test-name');
+
+      // delete temp spec file
+      await rm(tempSpecFile, { force: true });
+    });
+
+    it('should throw error when bundle command fails', async () => {
+      vi.mocked(getSpec).mockImplementationOnce(() =>
+        Promise.reject(new Error('Bundle failed')),
+      );
+
+      // write temp spec file
+      const specAsYaml = `openapi: 3.0.0
+info:
+  title: Test API
+  version: 1.0.0
+paths:
+  /test:
+    get:
+      summary: Test endpoint
+      responses:
+        '200':
+          description: A successful response
+`;
+      const tempSpecFile = join(
+        process.cwd(),
+        `temp-spec-${randomUUID()}.yaml`,
+      );
+      await writeFile(tempSpecFile, specAsYaml);
+
+      await expect(() =>
         bundleAndDereferenceSpecFile({
-          outputPath: './dist/spec.yaml',
-          specFile: './api/spec.yaml',
+          client: '@hey-api/client-fetch',
+          outputPath: './output/dereferenced-spec.yaml',
+          plugins: [],
+          specPath: tempSpecFile,
         }),
-      ).toThrow('Bundle failed');
+      ).rejects.toThrow('Bundle failed');
+
+      // delete temp spec file
+      await rm(tempSpecFile, { force: true });
+    });
+  });
+
+  describe('isUrl', () => {
+    it('should return true for valid URLs', () => {
+      expect(isUrl('https://example.com')).toBe(true);
+      expect(isUrl('http://example.com')).toBe(true);
+    });
+
+    it('should return false for invalid URLs', () => {
+      expect(isUrl('not-a-url')).toBe(false);
+    });
+
+    it('should return false for file paths', () => {
+      expect(isUrl('/path/to/spec.yaml')).toBe(false);
+    });
+  });
+
+  describe('isAFile', () => {
+    it('should return true for valid file paths', async () => {
+      await writeFile('./spec.yaml', 'openapi: 3.0.0');
+      expect(isAFile('./spec.yaml')).toBe(true);
+      await rm('./spec.yaml');
+    });
+
+    it('should return false for valid URLs', () => {
+      expect(isAFile('https://example.com')).toBe(false);
+    });
+
+    it('should return false for invalid file paths', () => {
+      expect(isAFile('not-a-file')).toBe(false);
+    });
+
+    it('should fail if provided a url', () => {
+      expect(isAFile('http://example.com')).toBe(false);
     });
   });
 });

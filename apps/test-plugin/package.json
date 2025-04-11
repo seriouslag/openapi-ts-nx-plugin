@@ -5,7 +5,5 @@
   "nx": {
     "name": "test-plugin"
   },
-  "dependencies": {
-    "@tanstack/react-query": "^5.71.5"
-  }
+  "dependencies": {}
 }

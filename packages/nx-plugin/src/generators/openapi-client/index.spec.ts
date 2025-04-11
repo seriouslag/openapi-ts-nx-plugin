@@ -1,8 +1,8 @@
+import type { initConfigs } from '@hey-api/openapi-ts';
 import { readJson } from '@nx/devkit';
-import { execSync } from 'child_process';
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'fs';
-import { rm } from 'fs/promises';
-import { dirname, join } from 'path';
+import { randomUUID } from 'crypto';
+import { existsSync, mkdirSync, rmSync } from 'fs';
+import { join } from 'path';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getGeneratorOptions } from '../../test-utils';
@@ -15,49 +15,20 @@ import {
   updatePackageJson,
 } from './index';
 
-// Mock execSync to prevent actual command execution
-vi.mock('child_process', () => ({
-  execSync: vi.fn((command: string) => {
-    // Mock successful bundling by copying the spec file
-    if (command.includes('redocly bundle')) {
-      const args = command.split(' ');
-      const specFileIndex = args.indexOf('bundle') + 1;
-      const outputFileIndex = args.indexOf('--output') + 1;
-
-      if (specFileIndex > 0 && outputFileIndex > 0) {
-        const specFile = args[specFileIndex];
-        const outputFile = args[outputFileIndex];
-
-        if (!specFile || !existsSync(specFile)) {
-          throw new Error(
-            `ENOENT: no such file or directory, open '${specFile}'`,
-          );
-        }
-
-        if (!outputFile) {
-          throw new Error(
-            `ENOENT: no such file or directory, open '${outputFile}'`,
-          );
-        }
-
-        const content = readFileSync(specFile, 'utf-8');
-        mkdirSync(dirname(outputFile), { recursive: true });
-        writeFileSync(outputFile, content);
-      }
-      return '';
-    }
-    return '';
-  }),
-}));
-
-// Mock generateClientCode to prevent actual code generation
-vi.mock('../../utils', async () => {
-  const actual = (await vi.importActual(
-    '../../utils',
-  )) as typeof import('../../utils');
+vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@hey-api/openapi-ts')>();
   return {
     ...actual,
-    generateClientCode: vi.fn(),
+    createClient: vi.fn(),
+    initConfigs: vi.fn((config: Parameters<typeof initConfigs>[0]) =>
+      Promise.resolve([
+        {
+          input: config?.input ?? 'default-input',
+          output: config?.output ?? 'default-output',
+          plugins: config?.plugins ?? [],
+        },
+      ]),
+    ),
   };
 });
 
@@ -65,7 +36,7 @@ vi.mock('latest-version', () => ({
   default: vi.fn(() => '1.0.0'),
 }));
 
-const tempDirectory = 'temp-openapi-client';
+const tempDirectory = `temp-openapi-client-${randomUUID()}`;
 
 describe('openapi-client generator', () => {
   beforeEach(() => {
@@ -73,17 +44,22 @@ describe('openapi-client generator', () => {
     vi.clearAllMocks();
   });
 
-  afterAll(async () => {
-    const tempDir = join(process.cwd(), tempDirectory);
-    if (existsSync(tempDir)) {
-      await rm(tempDir, { recursive: true });
+  afterAll(() => {
+    try {
+      const tempDir = join(process.cwd(), tempDirectory);
+      if (existsSync(tempDir)) {
+        rmSync(tempDir, { force: true, recursive: true });
+      }
+    } catch (error) {
+      console.error(error);
     }
   });
 
   describe('normalizeOptions', () => {
     it('should normalize options with default values', async () => {
+      const uuid = randomUUID();
       const { options, specPath } = await getGeneratorOptions({
-        name: 'test-api-1',
+        name: `test-api-${uuid}`,
         tempDirectory,
       });
       const normalized = normalizeOptions(options);
@@ -91,9 +67,9 @@ describe('openapi-client generator', () => {
       expect(normalized).toEqual({
         clientType: '@hey-api/client-fetch',
         plugins: [],
-        projectDirectory: `${tempDirectory}/test-api-1`,
+        projectDirectory: `${tempDirectory}/test-api-${uuid}`,
         projectName: 'test-api',
-        projectRoot: `${tempDirectory}/test-api-1/test-api`,
+        projectRoot: `${tempDirectory}/test-api-${uuid}/test-api`,
         projectScope: '@test-api',
         specFile: specPath,
         tagArray: ['api', 'openapi'],
@@ -104,7 +80,7 @@ describe('openapi-client generator', () => {
 
     it('should normalize options with custom directory and tags', async () => {
       const { options, specPath } = await getGeneratorOptions({
-        name: 'test-api-2',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
 
@@ -134,7 +110,7 @@ describe('openapi-client generator', () => {
   describe('generateNxProject', () => {
     it('should generate project configuration', async () => {
       const { options, tree } = await getGeneratorOptions({
-        name: 'test-api-3',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -153,7 +129,7 @@ describe('openapi-client generator', () => {
 
     it('should generate project files', async () => {
       const { options, tree } = await getGeneratorOptions({
-        name: 'test-api-4',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -178,29 +154,27 @@ describe('openapi-client generator', () => {
   describe('generateApi', () => {
     it('should process and bundle the OpenAPI spec file', async () => {
       const { options, specPath, tree } = await getGeneratorOptions({
-        name: 'test-api-5',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
       const { projectRoot } = normalizedOptions;
 
       await generateApi({
+        client: '@hey-api/client-fetch',
+        plugins: [],
         projectRoot,
         specFile: specPath,
         tempFolder: tempDirectory,
         tree,
       });
 
-      expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining(`redocly bundle ${specPath}`),
-        expect.any(Object),
-      );
       expect(tree.exists(`${projectRoot}/api/spec.yaml`)).toBeTruthy();
     });
 
     it('should throw error for invalid spec file', async () => {
       const { options, tree } = await getGeneratorOptions({
-        name: 'test-api-6',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -208,6 +182,8 @@ describe('openapi-client generator', () => {
 
       await expect(
         generateApi({
+          client: '@hey-api/client-fetch',
+          plugins: [],
           projectRoot,
           specFile: 'non-existent.yaml',
           tempFolder: tempDirectory,
@@ -220,7 +196,7 @@ describe('openapi-client generator', () => {
   describe('updatePackageJson', () => {
     it('should update package.json with correct dependencies', async () => {
       const { options, tree } = await getGeneratorOptions({
-        name: 'test-api-7',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -258,7 +234,7 @@ describe('openapi-client generator', () => {
 
     it('should update tsconfig with correct dependencies', async () => {
       const { options, tree } = await getGeneratorOptions({
-        name: 'test-api-8',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -298,7 +274,7 @@ describe('openapi-client generator', () => {
 
     it('should update package.json with axios dependencies when clientType is axios', async () => {
       const { options, tree } = await getGeneratorOptions({
-        name: 'test-api-9',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -328,7 +304,7 @@ describe('openapi-client generator', () => {
   describe('generateClientCode', () => {
     it('should generate client code without errors', async () => {
       const { options, specPath } = await getGeneratorOptions({
-        name: 'test-api-10',
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
       const normalizedOptions = normalizeOptions(options);
@@ -340,25 +316,24 @@ describe('openapi-client generator', () => {
         mkdirSync(fullProjectRoot, { recursive: true });
       }
 
-      expect(() =>
+      await expect(
         generateClientCode({
           clientType,
           outputPath: `${projectRoot}/src/generated`,
           plugins,
           specFile: specPath,
         }),
-      ).not.toThrow();
+      ).resolves.not.toThrow();
     });
   });
 
   describe('full generator', () => {
     it('should run the full generator successfully', async () => {
-      const { options, specPath, tree } = await getGeneratorOptions({
-        name: 'test-api-11',
+      const { options, tree } = await getGeneratorOptions({
+        name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
-      const task = await generator(tree, options);
-      expect(task).toBeDefined();
+      await generator(tree, options);
 
       // Verify project structure
       const normalizedOptions = normalizeOptions(options);
@@ -367,12 +342,6 @@ describe('openapi-client generator', () => {
       expect(tree.exists(`${projectRoot}/package.json`)).toBeTruthy();
       expect(tree.exists(`${projectRoot}/tsconfig.json`)).toBeTruthy();
       expect(tree.exists(`${projectRoot}/api/spec.yaml`)).toBeTruthy();
-
-      // Verify the generator was called with correct parameters
-      expect(execSync).toHaveBeenCalledWith(
-        expect.stringContaining(`redocly bundle ${specPath}`),
-        expect.any(Object),
-      );
     });
   });
 });

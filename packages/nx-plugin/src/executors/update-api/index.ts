@@ -1,7 +1,7 @@
 import type { PromiseExecutor } from '@nx/devkit';
 import { logger } from '@nx/devkit';
-import { existsSync } from 'fs';
-import { cp, mkdir, readFile, rm, writeFile } from 'fs/promises';
+import { existsSync, writeFileSync } from 'fs';
+import { cp, mkdir, readFile, rm } from 'fs/promises';
 import { join } from 'path';
 
 import {
@@ -21,40 +21,87 @@ async function setup({
   options: UpdateApiExecutorSchema;
   tempFolder: string;
 }) {
+  logger.debug(
+    `Setting up update-api executor with options: ${JSON.stringify(options, null, 2)}`,
+  );
+  logger.debug(`Using temp folder: ${tempFolder}`);
+  logger.debug(`Absolute temp folder path: ${absoluteTempFolder}`);
+
   const tempApiFolder = join(tempFolder, CONSTANTS.SPEC_DIR_NAME);
+  logger.debug(`Temp API folder path: ${tempApiFolder}`);
 
   // Create temp folders if they don't exist
   const absoluteTempApiFolder = join(
     absoluteTempFolder,
     CONSTANTS.SPEC_DIR_NAME,
   );
+  logger.debug(`Absolute temp API folder path: ${absoluteTempApiFolder}`);
+
   if (!existsSync(absoluteTempApiFolder)) {
     logger.debug(`Creating executor temp api folder: ${absoluteTempApiFolder}`);
     await mkdir(absoluteTempApiFolder, { recursive: true });
+    logger.debug(`Created temp API folder: ${absoluteTempApiFolder}`);
+  } else {
+    logger.debug(`Temp API folder already exists: ${absoluteTempApiFolder}`);
   }
   logger.debug('Temp folders created.');
 
   // Determine file paths
   const projectRoot = join(options.directory, options.name);
+  logger.debug(`Project root path: ${projectRoot}`);
+
   const apiDirectory = join(projectRoot, CONSTANTS.SPEC_DIR_NAME);
+  logger.debug(`API directory path: ${apiDirectory}`);
+
   const existingSpecPath = join(apiDirectory, CONSTANTS.SPEC_FILE_NAME);
+  logger.debug(`Existing spec file path: ${existingSpecPath}`);
+
   const tempSpecPath = join(tempApiFolder, CONSTANTS.SPEC_FILE_NAME);
+  logger.debug(`Temp spec file path: ${tempSpecPath}`);
+
   const generatedTempDir = join(tempFolder, CONSTANTS.GENERATED_DIR_NAME);
+  logger.debug(`Generated temp directory path: ${generatedTempDir}`);
 
   // Check if existing spec exists
   const absoluteExistingSpecPath = join(process.cwd(), existingSpecPath);
+  logger.debug(`Absolute existing spec path: ${absoluteExistingSpecPath}`);
+
   if (!existsSync(absoluteExistingSpecPath)) {
+    logger.error(`No existing spec file found at ${existingSpecPath}.`);
     throw new Error(`No existing spec file found at ${existingSpecPath}.`);
+  } else {
+    logger.debug(`Existing spec file found at ${absoluteExistingSpecPath}`);
   }
 
-  bundleAndDereferenceSpecFile({
+  logger.info(`Bundling and dereferencing spec file from: ${options.spec}`);
+  const dereferencedSpec = await bundleAndDereferenceSpecFile({
+    client: options.client,
     outputPath: tempSpecPath,
-    specFile: options.spec,
+    plugins: options.plugins,
+    specPath: options.spec,
   });
+  logger.info(`Spec file bundled successfully`);
+
+  // save the dereferenced spec to the temp spec file
+  try {
+    logger.debug(`Writing dereferenced spec to temp file: ${tempSpecPath}`);
+    writeFileSync(tempSpecPath, JSON.stringify(dereferencedSpec, null, 2));
+    logger.debug(`Dereferenced spec written to temp file successfully`);
+  } catch (error) {
+    logger.error(`Failed to write dereferenced spec to temp file: ${error}.`);
+    throw error;
+  }
 
   logger.info('Reading existing and new spec files...');
   const absoluteTempSpecPath = join(process.cwd(), tempSpecPath);
+  logger.debug(`Absolute temp spec path: ${absoluteTempSpecPath}`);
+
+  logger.debug(`Reading new spec file from: ${absoluteTempSpecPath}`);
   const newSpecString = await readFile(absoluteTempSpecPath, 'utf-8');
+  logger.debug(
+    `New spec file read successfully, size: ${newSpecString.length} bytes`,
+  );
+
   if (!newSpecString) {
     logger.error('New spec file is empty.');
     throw new Error('New spec file is empty.');
@@ -86,6 +133,7 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
   const force = options.force ?? false;
 
   try {
+    logger.info(`Setting up executor environment...`);
     const {
       absoluteExistingSpecPath,
       absoluteTempSpecPath,
@@ -99,6 +147,8 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       options,
       tempFolder,
     });
+
+    logger.info(`Comparing existing spec with new spec...`);
     const areSpecsEqual = await compareSpecs(
       absoluteExistingSpecPath,
       absoluteTempSpecPath,
@@ -108,6 +158,7 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     if (areSpecsEqual) {
       logger.info('No changes detected in the API spec.');
       if (!force) {
+        logger.info('Force flag is false. Skipping client code generation.');
         await cleanup(absoluteTempFolder);
         return { success: true };
       } else {
@@ -122,6 +173,7 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     // Generate new client code in temp directory
     // Create temp generated directory
     const absoluteGeneratedTempDir = join(process.cwd(), generatedTempDir);
+
     if (!existsSync(absoluteGeneratedTempDir)) {
       await mkdir(absoluteGeneratedTempDir);
     }
@@ -140,6 +192,7 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     const absoluteApiDirectory = join(process.cwd(), apiDirectory);
     const apiDirectoryExists = existsSync(absoluteApiDirectory);
     const existingSpecFileExists = existsSync(absoluteExistingSpecPath);
+
     // Copy new spec to project
     if (apiDirectoryExists) {
       if (existingSpecFileExists) {
@@ -147,7 +200,8 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       } else {
         logger.debug('No existing spec file found. Creating...');
       }
-      await writeFile(absoluteExistingSpecPath, newSpecString);
+      writeFileSync(absoluteExistingSpecPath, newSpecString);
+      logger.debug(`Spec file updated successfully`);
     } else {
       logger.error(
         `No API directory found at ${apiDirectory} after checking once, exiting.`,
@@ -185,9 +239,8 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     await cleanup(absoluteTempFolder);
     return { success: true };
   } catch (error) {
-    logger.error(
-      `Failed to update API: ${error instanceof Error ? error.message : String(error)}.`,
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.debug(`Error details: ${errorMessage}.`);
     await cleanup(absoluteTempFolder);
     return { success: false };
   }
@@ -195,8 +248,8 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
 
 async function cleanup(tempFolder: string) {
   const absoluteTempFolder = join(process.cwd(), tempFolder);
+
   if (existsSync(absoluteTempFolder)) {
-    logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
     await rm(absoluteTempFolder, { force: true, recursive: true });
   }
 }
