@@ -67,6 +67,7 @@ describe('openapi-client generator', () => {
       expect(normalized).toEqual({
         clientType: '@hey-api/client-fetch',
         plugins: [],
+        isPrivate: true,
         projectDirectory: `${tempDirectory}/test-api-${uuid}`,
         projectName: 'test-api',
         projectRoot: `${tempDirectory}/test-api-${uuid}/test-api`,
@@ -94,6 +95,7 @@ describe('openapi-client generator', () => {
 
       expect(normalized).toEqual({
         clientType: '@hey-api/client-fetch',
+        isPrivate: true,
         plugins: [],
         projectDirectory: 'custom-dir',
         projectName: 'test-api',
@@ -224,6 +226,8 @@ describe('openapi-client generator', () => {
 
       await updatePackageJson({
         clientType: '@hey-api/client-fetch',
+        isPrivate: true,
+        plugins: [],
         projectRoot,
         tree,
       });
@@ -292,6 +296,8 @@ describe('openapi-client generator', () => {
 
       await updatePackageJson({
         clientType: '@hey-api/client-axios',
+        isPrivate: true,
+        plugins: [],
         projectRoot,
         tree,
       });
