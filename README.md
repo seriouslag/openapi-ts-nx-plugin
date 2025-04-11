@@ -21,9 +21,10 @@ npx nx run @test-plugin/nx-plugin:build && nx g @test-plugin/nx-plugin:openapi-c
 # runs the executor to update the generated package
 npx nx run @test-api/pokemon-api:updateApi
 # There should be no update since the spec is the same
+# This result will be cached by nx, for a new result the API spec file must change or the `--skip-nx-cache --force` flags must be used
 
-# to test an update then make a change to one of the routes paths in the spec file located at ./packages/pokemon-api/src/spec.yaml
-# then run the executor again and you should see the update
+# to test an update: Ether change the source spec file or make a change to one of the routes paths in the cached spec file located at ./packages/pokemon-api/src/spec.yaml
+# then run the executor again and you will see it recreate the client code
 npx nx run @test-api/pokemon-api:updateApi --skip-nx-cache --force
 ```
 
