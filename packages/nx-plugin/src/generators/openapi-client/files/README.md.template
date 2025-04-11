@@ -34,7 +34,3 @@ nx run <%= projectScope %>/<%= projectName %>:updateApi
 ## Force the client to rebuild
 nx run <%= projectScope %>/<%= projectName %>:updateApi --force --skip-nx-cache
 ```
-
-## License
-
-[MIT](LICENSE)

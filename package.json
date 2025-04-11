@@ -1,8 +1,12 @@
 {
-  "name": "@test-plugin/source",
+  "name": "@seriouslag/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "build": "nx run-many --target=build",
+    "test": "nx run-many --target=test",
+    "publish": "nx run-many --target=publish"
+  },
   "private": true,
   "dependencies": {
     "@hey-api/json-schema-ref-parser": "1.0.4",

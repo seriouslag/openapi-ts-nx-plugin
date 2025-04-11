@@ -1,7 +1,6 @@
 {
-  "name": "@test-plugin/nx-plugin",
+  "name": "@seriouslag/nx-openapi-ts-plugin",
   "version": "0.0.1",
-  "private": true,
   "type": "commonjs",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
@@ -15,15 +14,13 @@
       "default": "./dist/index.js"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "generators": "./generators.json",
   "executors": "./executors.json",
   "dependencies": {
     "@hey-api/openapi-ts": "https://pkg.pr.new/hey-api/openapi-ts/@hey-api/openapi-ts@1934"
   },
-  "devDependencies": {},
-  "files": [
-    "dist",
-    "LICENSE.md",
-    "generators.json"
-  ]
+  "devDependencies": {}
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@test-plugin/nx-plugin",
+  "name": "@seriouslag/nx-openapi-ts-plugin",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/nx-plugin/src",
   "projectType": "library",
