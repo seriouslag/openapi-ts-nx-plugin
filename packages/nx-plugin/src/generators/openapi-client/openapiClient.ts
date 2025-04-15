@@ -340,6 +340,22 @@ export function normalizeOptions(
   };
 }
 
+/**
+ * Builds the spec path
+ */
+export function buildSpecPath(specPath: string) {
+  const isSpecFileUrl = isUrl(specPath);
+  if (isSpecFileUrl) {
+    return specPath;
+  }
+  const isSpecFileAbsolutePath = isAbsolute(specPath);
+  if (isSpecFileAbsolutePath) {
+    return specPath;
+  }
+  const newSpecPath = specPath.replace('./', `{workspaceRoot}/`);
+  return newSpecPath;
+}
+
 export function buildUpdateOptions({
   clientType,
   projectDirectory,
@@ -348,14 +364,7 @@ export function buildUpdateOptions({
   plugins,
   specFile,
 }: NormalizedOptions): UpdateApiExecutorSchema {
-  const isSpecFileUrl = isUrl(specFile);
-  const isSpecFileAbsolutePath = isAbsolute(specFile);
-  const isSpecFileRelativePath = !isSpecFileUrl && !isSpecFileAbsolutePath;
-
-  // if the spec file is a relative path then we need to remove the ./ from the spec file and add `{workspaceRoot}` to the spec file
-  const newSpecFilePath = isSpecFileRelativePath
-    ? specFile.replace('./', `{workspaceRoot}/`)
-    : specFile;
+  const newSpecFilePath = buildSpecPath(specFile);
 
   return {
     client: clientType,
@@ -392,7 +401,7 @@ export async function generateNxProject({
   } = normalizedOptions;
 
   const specIsAFile = isAFile(specFile);
-  const specIsRemote = isUrl(specFile);
+  const isSpecRemote = isUrl(specFile);
 
   const additionalEntryPoints: string[] = [];
 
@@ -415,8 +424,8 @@ export async function generateNxProject({
 
   if (specIsAFile) {
     // if the spec file is a file then we need to add it to inputs so that it is watched by NX
-    updateInputs.push(specFile);
-  } else if (specIsRemote) {
+    updateInputs.push(buildSpecPath(specFile));
+  } else if (isSpecRemote) {
     // here we should add a hash of the spec file to the inputs so that NX will watch for changes
     // fetch the spec file from url and get the hash
     const apiHash: Input = {
