@@ -11,7 +11,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [
+            macos-latest,
+            ubuntu-latest,
+            # windows-latest # TODO: enable when rollup build works on window
+          ]
         node-version: ['20', '22', '24']
 
     steps:
