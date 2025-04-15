@@ -23,8 +23,7 @@
     "check-exports": "attw --pack .",
     "test:watch": "vitest watch",
     "test": "vitest",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build"
+    "typecheck": "tsc --noEmit"
   },
   "exports": {
     ".": {
