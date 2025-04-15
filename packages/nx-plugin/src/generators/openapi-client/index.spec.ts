@@ -1,25 +1,34 @@
-import type { initConfigs } from '@hey-api/openapi-ts';
+import { randomUUID } from 'node:crypto';
+import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+
+import type { initConfigs } from '@hey-api/openapi-ts/internal';
 import { readJson } from '@nx/devkit';
-import { randomUUID } from 'crypto';
-import { existsSync, mkdirSync, rmSync } from 'fs';
-import { join } from 'path';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getGeneratorOptions } from '../../test-utils';
 import { generateClientCode } from '../../utils';
-import generator, { updateTsConfig } from './index';
+import generator, { updateTsConfig } from './openapiClient';
 import {
   generateApi,
   generateNxProject,
   normalizeOptions,
   updatePackageJson,
-} from './index';
+} from './openapiClient';
 
 vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@hey-api/openapi-ts')>();
   return {
     ...actual,
     createClient: vi.fn(),
+  };
+});
+
+vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@hey-api/openapi-ts/internal')>();
+  return {
+    ...actual,
     initConfigs: vi.fn((config: Parameters<typeof initConfigs>[0]) =>
       Promise.resolve([
         {
@@ -53,6 +62,8 @@ describe('openapi-client generator', () => {
     } catch (error) {
       console.error(error);
     }
+
+    vi.resetAllMocks();
   });
 
   describe('normalizeOptions', () => {
@@ -66,8 +77,8 @@ describe('openapi-client generator', () => {
 
       expect(normalized).toEqual({
         clientType: '@hey-api/client-fetch',
-        plugins: [],
         isPrivate: true,
+        plugins: [],
         projectDirectory: `${tempDirectory}/test-api-${uuid}`,
         projectName: 'test-api',
         projectRoot: `${tempDirectory}/test-api-${uuid}/test-api`,

@@ -1,19 +1,21 @@
-import type { initConfigs } from '@hey-api/openapi-ts';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import type { initConfigs } from '@hey-api/openapi-ts/internal';
 import { type ExecutorContext, logger } from '@nx/devkit';
 import { randomUUID } from 'crypto';
-import { existsSync } from 'fs';
-import { mkdir, readFile, rm, writeFile } from 'fs/promises';
-import { join } from 'path';
 import { afterAll, describe, expect, it, vi } from 'vitest';
 
-import generator from '../../generators/openapi-client';
+import generator from '../../generators/openapi-client/openapiClient';
 import { getGeneratorOptions, TestOptions } from '../../test-utils';
 import { CONSTANTS } from '../../vars';
-import executor from '.';
+import executor from './updateApi';
 import type { UpdateApiExecutorSchema } from './schema';
 
-vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@hey-api/openapi-ts')>();
+vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@hey-api/openapi-ts/internal')>();
   return {
     ...actual,
     initConfigs: vi.fn((config: Parameters<typeof initConfigs>[0]) =>
@@ -116,6 +118,7 @@ describe('UpdateApi Executor', () => {
     if (existsSync(apiDir)) {
       await rm(apiDir, { force: true, recursive: true });
     }
+    vi.resetAllMocks();
   });
 
   it('can run', async () => {

@@ -1,8 +1,9 @@
-import type { initConfigs } from '@hey-api/openapi-ts';
-import { createClient, getSpec } from '@hey-api/openapi-ts';
-import { randomUUID } from 'crypto';
-import { rm, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { randomUUID } from 'node:crypto';
+import { rm, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import { createClient } from '@hey-api/openapi-ts';
+import { getSpec, type initConfigs } from '@hey-api/openapi-ts/internal';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -20,6 +21,14 @@ vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
   return {
     ...actual,
     createClient: vi.fn(),
+  };
+});
+
+vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@hey-api/openapi-ts/internal')>();
+  return {
+    ...actual,
     getSpec: vi.fn(() =>
       Promise.resolve({
         data: {},
@@ -120,12 +129,14 @@ describe('utils', () => {
 
   describe('generateClientCode', () => {
     it('should execute command successfully', async () => {
-      await generateClientCode({
-        clientType: '@hey-api/client-fetch',
-        outputPath: './src/generated',
-        plugins: [],
-        specFile: './api/spec.yaml',
-      });
+      await expect(
+        generateClientCode({
+          clientType: '@hey-api/client-fetch',
+          outputPath: './src/generated',
+          plugins: [],
+          specFile: './api/spec.yaml',
+        }),
+      ).resolves.not.toThrow();
 
       expect(createClient).toHaveBeenCalledWith({
         input: './api/spec.yaml',
@@ -139,22 +150,14 @@ describe('utils', () => {
         throw new Error('Command failed');
       });
 
-      try {
-        await generateClientCode({
+      await expect(
+        generateClientCode({
           clientType: '@hey-api/client-fetch',
           outputPath: './src/generated',
           plugins: [],
           specFile: './api/spec.yaml',
-        });
-        // If we get here, fail the test
-        expect.fail('Expected function to throw');
-      } catch (error) {
-        if (error instanceof Error) {
-          expect(error.message).toContain('Command failed');
-        } else {
-          expect.fail('Expected error to be an instance of Error');
-        }
-      }
+        }),
+      ).rejects.toThrow('Command failed');
     });
   });
 

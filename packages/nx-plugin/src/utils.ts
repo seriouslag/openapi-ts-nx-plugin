@@ -1,12 +1,13 @@
+import { existsSync, lstatSync } from 'node:fs';
+
 import type { JSONSchema } from '@hey-api/json-schema-ref-parser';
+import { createClient } from '@hey-api/openapi-ts';
 import {
-  createClient,
   getSpec,
   initConfigs,
   parseOpenApiSpec,
-} from '@hey-api/openapi-ts';
+} from '@hey-api/openapi-ts/internal';
 import { logger } from '@nx/devkit';
-import { existsSync, lstatSync } from 'fs';
 import OpenApiDiff from 'openapi-diff';
 
 export function generateClientCommand({

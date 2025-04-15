@@ -6,15 +6,9 @@
     "outDir": "dist",
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
     "emitDeclarationOnly": false,
-    "module": "nodenext",
-    "moduleResolution": "nodenext",
-    "types": [
-      "node",
-      "vitest/globals",
-      "vitest/importMeta",
-      "vite/client",
-      "vitest"
-    ]
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "types": ["node"]
   },
   "include": ["src/**/*.ts"],
   "references": [],

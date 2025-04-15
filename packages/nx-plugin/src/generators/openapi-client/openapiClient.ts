@@ -1,3 +1,7 @@
+import { existsSync, writeFileSync } from 'node:fs';
+import { mkdir, rm } from 'node:fs/promises';
+import { join } from 'node:path';
+
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
 import {
   addDependenciesToPackageJson,
@@ -10,9 +14,6 @@ import {
   names,
   updateJson,
 } from '@nx/devkit';
-import { existsSync, writeFileSync } from 'fs';
-import { mkdir, rm } from 'fs/promises';
-import { join } from 'path';
 
 import packageJson from '../../../package.json';
 import type { UpdateApiExecutorSchema } from '../../executors/update-api/schema';
@@ -126,6 +127,10 @@ export interface OpenApiClientGeneratorSchema {
    */
   plugins: string[];
   /**
+   * Whether to make the generated package private, defaults to `true`
+   */
+  private?: boolean;
+  /**
    * The scope of the project
    */
   scope: string;
@@ -146,10 +151,6 @@ export interface OpenApiClientGeneratorSchema {
    * The test runner to use for the project, defaults to `none`
    */
   test?: TestRunner | 'none';
-  /**
-   * Whether to make the generated package private, defaults to `true`
-   */
-  private?: boolean;
 }
 
 export default async function (
@@ -167,13 +168,13 @@ export default async function (
 
     const {
       clientType,
+      isPrivate,
       plugins,
       projectName,
       projectRoot,
       projectScope,
       specFile,
       tempFolder,
-      isPrivate,
     } = normalizedOptions;
 
     logger.info(
@@ -218,10 +219,10 @@ export default async function (
     logger.info(`Updating package.json with dependencies`);
     const installDeps = await updatePackageJson({
       clientType,
-      projectRoot,
-      tree,
       isPrivate,
       plugins,
+      projectRoot,
+      tree,
     });
 
     // Update the tsconfig.base.json file
@@ -271,6 +272,7 @@ export default async function (
 
 export interface NormalizedOptions {
   clientType: string;
+  isPrivate: boolean;
   plugins: string[];
   projectDirectory: string;
   projectName: string;
@@ -280,7 +282,6 @@ export interface NormalizedOptions {
   tagArray: string[];
   tempFolder: string;
   test: TestRunner | 'none';
-  isPrivate: boolean;
 }
 
 export type GeneratedOptions = NormalizedOptions & typeof CONSTANTS;
@@ -318,6 +319,7 @@ export function normalizeOptions(
 
   return {
     clientType: options.client,
+    isPrivate: options.private ?? true,
     plugins: options.plugins,
     projectDirectory,
     projectName,
@@ -327,7 +329,6 @@ export function normalizeOptions(
     tagArray,
     tempFolder,
     test: options.test ?? 'none',
-    isPrivate: options.private ?? true,
   };
 }
 
@@ -421,8 +422,6 @@ export function generateNxProject({
           ...baseInputs,
         ],
         options: {
-          generateExportsField: true,
-          generatePackageJson: true,
           additionalEntryPoints,
           assets: [
             {
@@ -431,6 +430,8 @@ export function generateNxProject({
               output: '.',
             },
           ],
+          generateExportsField: true,
+          generatePackageJson: true,
           main: `{projectRoot}/src/index.ts`,
           outputPath: `{projectRoot}/dist`,
           rootDir: `{projectRoot}/src`,
@@ -648,19 +649,19 @@ async function getPackageDetails(name: string) {
  */
 export async function updatePackageJson({
   clientType,
-  projectRoot,
-  tree,
   isPrivate,
   plugins,
+  projectRoot,
+  tree,
 }: {
   clientType: string;
-  projectRoot: string;
-  tree: Tree;
   /**
    * Whether to make the generated package private
    */
   isPrivate: boolean;
   plugins: string[];
+  projectRoot: string;
+  tree: Tree;
 }) {
   const { default: latestVersion } = await import('latest-version');
 
