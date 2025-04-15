@@ -18,7 +18,7 @@ npm install -D @seriouslag/plugin-nx
 
 This plugin provides a generator for generating OpenAPI clients using the `@hey-api/openapi-ts` library.
 
-Run in interactive mode `nx g @seriouslag/nx-plugin:openapi-client`
+Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-client`
 
 ##### Options
 
@@ -36,7 +36,7 @@ Run in interactive mode `nx g @seriouslag/nx-plugin:openapi-client`
 ##### Example
 
 ```bash
-nx g @seriouslag/nx-plugin:openapi-client --name=my-api --client=@hey-api/client-fetch --scope=@my-app --directory=libs --spec=./spec.yaml --tags=api,openapi
+nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --client=@hey-api/client-fetch --scope=@my-app --directory=libs --spec=./spec.yaml --tags=api,openapi
 ```
 
 ### Executors

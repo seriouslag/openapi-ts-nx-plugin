@@ -1,4 +1,4 @@
-import { existsSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
@@ -143,7 +143,7 @@ export interface OpenApiClientGeneratorSchema {
    */
   tags?: string[];
   /**
-   * The directory to use for the temp folder, defaults to `./tmp`
+   * The directory to use for the temp folder, defaults to `./plugin-tmp`
    * Only used for testing purposes
    */
   tempFolderDir?: string;
@@ -160,28 +160,26 @@ export default async function (
   logger.info(
     `Starting OpenAPI client generator with options: ${JSON.stringify(options, null, 2)}`,
   );
+  const normalizedOptions = normalizeOptions(options);
+  logger.debug(
+    `Normalized options: ${JSON.stringify(normalizedOptions, null, 2)}`,
+  );
+  const {
+    clientType,
+    isPrivate,
+    plugins,
+    projectName,
+    projectRoot,
+    projectScope,
+    specFile,
+    tempFolder,
+  } = normalizedOptions;
+  const absoluteTempFolder = join(process.cwd(), tempFolder);
+  logger.info(
+    `Generating OpenAPI client for '${projectName}' using client type '${clientType}'`,
+  );
+  logger.debug(`Using plugins: ${plugins.join(', ')}`);
   try {
-    const normalizedOptions = normalizeOptions(options);
-    logger.debug(
-      `Normalized options: ${JSON.stringify(normalizedOptions, null, 2)}`,
-    );
-
-    const {
-      clientType,
-      isPrivate,
-      plugins,
-      projectName,
-      projectRoot,
-      projectScope,
-      specFile,
-      tempFolder,
-    } = normalizedOptions;
-
-    logger.info(
-      `Generating OpenAPI client for '${projectName}' using client type '${clientType}'`,
-    );
-    logger.debug(`Using plugins: ${plugins.join(', ')}`);
-
     const clientPlugins = getClientPlugins({
       ...normalizedOptions,
       inputPlugins: plugins,
@@ -206,7 +204,7 @@ export default async function (
 
     // Generate the api client code
     logger.info(`Generating API client code using spec file: ${specFile}`);
-    await generateApi({
+    const { specFileLocalLocations } = await generateApi({
       client: clientType,
       plugins,
       projectRoot,
@@ -241,7 +239,7 @@ export default async function (
       clientType,
       outputPath: `${projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
       plugins,
-      specFile: `${tempFolder}/${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`,
+      specFile: specFileLocalLocations,
     });
 
     // Format the files
@@ -249,7 +247,6 @@ export default async function (
     await formatFiles(tree);
 
     // Remove the temp folder
-    const absoluteTempFolder = join(process.cwd(), tempFolder);
     logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
     await rm(absoluteTempFolder, { force: true, recursive: true });
 
@@ -267,6 +264,9 @@ export default async function (
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`OpenAPI client generator failed: ${errorMessage}`);
     throw error;
+  } finally {
+    logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
+    await rm(absoluteTempFolder, { force: true, recursive: true });
   }
 }
 
@@ -605,26 +605,32 @@ export async function generateApi({
     const dereferencedSpecString = JSON.stringify(dereferencedSpec, null, 2);
     const absoluteSpecDestination = join(process.cwd(), tempSpecFolder);
 
-    // Read the bundled file back into the tree
-    if (dereferencedSpec) {
-      try {
-        // write to temp spec destination
-        await mkdir(absoluteSpecDestination, { recursive: true });
-        writeFileSync(absoluteTempSpecDestination, dereferencedSpecString);
-      } catch (error: unknown) {
-        const errorMessage =
-          error instanceof Error ? error.message : String(error);
-        logger.error(
-          `Failed to write dereferenced spec to temp file: ${errorMessage}.`,
-        );
-        throw error;
-      }
-      // write to to destination in the tree
-      tree.write(specDestination, dereferencedSpecString);
-    } else {
+    if (!dereferencedSpec) {
       logger.error('Failed to bundle spec file.');
       throw new Error('Failed to bundle spec file.');
     }
+
+    // Read the bundled file back into the tree
+    try {
+      // write to temp spec destination
+      mkdirSync(absoluteSpecDestination, { recursive: true });
+      writeFileSync(absoluteTempSpecDestination, dereferencedSpecString);
+      logger.debug(
+        `Dereferenced spec written to temp file: ${absoluteTempSpecDestination}`,
+      );
+      return {
+        specFileLocalLocations: absoluteTempSpecDestination,
+      };
+    } catch (error: unknown) {
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      logger.error(
+        `Failed to write dereferenced spec to temp file: ${errorMessage}.`,
+      );
+      throw error;
+    }
+    // write to to destination in the tree
+    tree.write(specDestination, dereferencedSpecString);
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to bundle OpenAPI spec: ${errorMessage}.`);
