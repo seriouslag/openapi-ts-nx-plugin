@@ -6,13 +6,16 @@ import type { ProjectConfiguration, Tree } from '@nx/devkit';
 import {
   addDependenciesToPackageJson,
   addProjectConfiguration,
+  detectPackageManager,
   formatFiles,
   generateFiles,
   installPackagesTask,
+  isWorkspacesEnabled,
   joinPathFragments,
   logger,
   names,
   updateJson,
+  workspaceRoot,
 } from '@nx/devkit';
 
 import packageJson from '../../../package.json';
@@ -102,10 +105,15 @@ const testRunners: Record<
      * The template path to the test files
      */
     templatePath: string;
+    /**
+     * Additional dev dependencies to be added to the project
+     */
+    additionalDevDependencies?: string[];
   }
 > = {
   vitest: {
     templatePath: './tests/vitest',
+    additionalDevDependencies: ['vite', 'vitest'],
   },
 };
 
@@ -196,7 +204,7 @@ export default async function (
 
     // Generate the Nx project
     logger.info(`Generating Nx project structure`);
-    generateNxProject({
+    await generateNxProject({
       clientPlugins,
       normalizedOptions,
       tree,
@@ -246,10 +254,6 @@ export default async function (
     logger.debug(`Formatting generated files`);
     await formatFiles(tree);
 
-    // Remove the temp folder
-    logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
-    await rm(absoluteTempFolder, { force: true, recursive: true });
-
     logger.info(
       `OpenAPI client generator completed successfully for ${projectName}`,
     );
@@ -257,7 +261,11 @@ export default async function (
     return async () => {
       logger.info(`Installing dependencies for ${projectName}`);
       await installDeps();
-      installPackagesTask(tree);
+      const packageManager = detectPackageManager(workspaceRoot);
+      const installDirectory = isWorkspacesEnabled(packageManager)
+        ? workspaceRoot
+        : projectRoot;
+      installPackagesTask(tree, true, installDirectory, packageManager);
       logger.info(`Dependencies installed successfully`);
     };
   } catch (error) {
@@ -335,7 +343,7 @@ export function normalizeOptions(
 /**
  * Generates the nx project
  */
-export function generateNxProject({
+export async function generateNxProject({
   clientPlugins,
   normalizedOptions,
   tree,
@@ -491,7 +499,7 @@ export function generateNxProject({
 
   // Generate the test files
   if (test !== 'none') {
-    generateTestFiles({
+    await generateTestFiles({
       generatedOptions,
       projectRoot,
       test,
@@ -520,7 +528,7 @@ function handlePlugin({
   }
 }
 
-export function generateTestFiles({
+export async function generateTestFiles({
   generatedOptions,
   projectRoot,
   test,
@@ -549,6 +557,26 @@ export function generateTestFiles({
     projectRoot,
     generatedOptions,
   );
+
+  // add the dev dependencies
+  const { additionalDevDependencies } = testRunners[test];
+  if (additionalDevDependencies && additionalDevDependencies.length > 0) {
+    const depsTask = additionalDevDependencies.map(getPackageDetails);
+    const results = await Promise.all(depsTask);
+    const devDeps = results.reduce(
+      (acc, result) => {
+        acc[result.packageName] = result.packageVersion;
+        return acc;
+      },
+      {} as Record<string, string>,
+    );
+    addDependenciesToPackageJson(
+      tree,
+      {},
+      devDeps,
+      join(projectRoot, 'package.json'),
+    );
+  }
 }
 
 /**
@@ -618,9 +646,6 @@ export async function generateApi({
       logger.debug(
         `Dereferenced spec written to temp file: ${absoluteTempSpecDestination}`,
       );
-      return {
-        specFileLocalLocations: absoluteTempSpecDestination,
-      };
     } catch (error: unknown) {
       const errorMessage =
         error instanceof Error ? error.message : String(error);
@@ -631,6 +656,9 @@ export async function generateApi({
     }
     // write to to destination in the tree
     tree.write(specDestination, dereferencedSpecString);
+    return {
+      specFileLocalLocations: absoluteTempSpecDestination,
+    };
   } catch (error: unknown) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(`Failed to bundle OpenAPI spec: ${errorMessage}.`);

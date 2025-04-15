@@ -128,7 +128,7 @@ describe('openapi-client generator', () => {
       });
       const normalizedOptions = normalizeOptions(options);
 
-      generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
+      await generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
 
       const config = readJson(
         tree,
@@ -147,7 +147,7 @@ describe('openapi-client generator', () => {
       });
       const normalizedOptions = normalizeOptions(options);
 
-      generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
+      await generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
 
       expect(
         tree.exists(`${normalizedOptions.projectRoot}/tsconfig.json`),
