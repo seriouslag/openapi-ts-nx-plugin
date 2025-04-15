@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
-import { join } from 'node:path';
+import { isAbsolute, join } from 'node:path';
 
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
 import {
@@ -340,6 +340,33 @@ export function normalizeOptions(
   };
 }
 
+export function buildUpdateOptions({
+  clientType,
+  projectDirectory,
+  projectName,
+  projectScope,
+  plugins,
+  specFile,
+}: NormalizedOptions): UpdateApiExecutorSchema {
+  const isSpecFileUrl = isUrl(specFile);
+  const isSpecFileAbsolutePath = isAbsolute(specFile);
+  const isSpecFileRelativePath = !isSpecFileUrl && !isSpecFileAbsolutePath;
+
+  // if the spec file is a relative path then we need to remove the ./ from the spec file and add `{workspaceRoot}` to the spec file
+  const newSpecFilePath = isSpecFileRelativePath
+    ? specFile.replace('./', `{workspaceRoot}/`)
+    : specFile;
+
+  return {
+    client: clientType,
+    directory: projectDirectory,
+    name: projectName,
+    plugins,
+    scope: projectScope,
+    spec: newSpecFilePath,
+  };
+}
+
 /**
  * Generates the nx project
  */
@@ -356,7 +383,6 @@ export async function generateNxProject({
   const {
     clientType,
     plugins,
-    projectDirectory,
     projectName,
     projectRoot,
     projectScope,
@@ -364,15 +390,6 @@ export async function generateNxProject({
     tagArray,
     test,
   } = normalizedOptions;
-
-  const updateOptions: UpdateApiExecutorSchema = {
-    client: clientType,
-    directory: projectDirectory,
-    name: projectName,
-    plugins,
-    scope: projectScope,
-    spec: specFile,
-  };
 
   const specIsAFile = isAFile(specFile);
   const specIsRemote = isUrl(specFile);
@@ -467,7 +484,7 @@ export async function generateNxProject({
         cache: true,
         executor: `${packageJson.name}:update-api`,
         inputs: updateInputs,
-        options: updateOptions,
+        options: buildUpdateOptions(normalizedOptions),
         outputs: [
           `{projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
           `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
