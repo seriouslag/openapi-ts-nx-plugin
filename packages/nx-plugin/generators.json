@@ -3,8 +3,8 @@
   "version": "0.0.1",
   "generators": {
     "openapi-client": {
-      "factory": "./dist/openapiClient.esm.js",
-      "schema": "./src/generators/openapi-client/schema.json",
+      "factory": "./dist/openapiClient.cjs.js",
+      "schema": "./dist/openapiClient.schema.json",
       "description": "Generate an OpenAPI client library from an OpenAPI spec file."
     }
   }

@@ -14,10 +14,31 @@
           "{projectRoot}/src/generators/openapi-client/openapiClient.ts",
           "{projectRoot}/src/executors/update-api/updateApi.ts"
         ],
-        "format": ["esm", "cjs"],
+        "format": ["cjs"],
         "tsConfig": "{projectRoot}/tsconfig.lib.json",
         "rootDir": "{projectRoot}/src",
-        "assets": []
+        "assets": [
+          {
+            "glob": "**/*.json",
+            "input": "{projectRoot}/src",
+            "output": "."
+          },
+          {
+            "glob": "files",
+            "input": "{projectRoot}/src/generators/openapi-client",
+            "output": "."
+          },
+          {
+            "glob": "plugins",
+            "input": "{projectRoot}/src/generators/openapi-client",
+            "output": "."
+          },
+          {
+            "glob": "tests",
+            "input": "{projectRoot}/src/generators/openapi-client",
+            "output": "."
+          }
+        ]
       }
     }
   },

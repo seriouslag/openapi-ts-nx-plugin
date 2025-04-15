@@ -1,8 +1,8 @@
 {
   "executors": {
     "update-api": {
-      "implementation": "./dist/updateApi.esm.js",
-      "schema": "./src/executors/update-api/schema.json",
+      "implementation": "./dist/updateApi.cjs.js",
+      "schema": "./dist/updateApi.json",
       "description": "Updates the OpenAPI spec file and generates new client code if needed."
     }
   }
