@@ -1,6 +1,6 @@
 {
   "name": "@seriouslag/nx-openapi-ts-plugin",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "🚀 Nx plugin for `@hey-api/openapi-ts` codegen.",
   "repository": {
     "type": "git",
@@ -61,5 +61,8 @@
     "dist",
     "src",
     "LICENSE.md"
-  ]
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }
