@@ -839,12 +839,13 @@ export function updateTsConfig({
 export async function getProjectThatSpecIsIn(tree: Tree, specFile: string) {
   const projects = getProjects(tree);
   for (const project of projects.values()) {
-    if (
-      project.sourceRoot &&
-      normalize(specFile).startsWith(normalize(project.sourceRoot))
-    ) {
+    const normalizedSpecFile = normalize(specFile);
+    const normalizedProjectRoot = normalize(project.root);
+    // if the spec file is under the project root then return the project name
+    if (normalizedSpecFile.startsWith(normalizedProjectRoot)) {
       const projectJsonName = project.name;
       if (projectJsonName) {
+        logger.debug('Provided spec file is in project: ', projectJsonName);
         return projectJsonName;
       }
       const packageJsonPath = join(project.root, 'package.json');
