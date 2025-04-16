@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
-import { isAbsolute, join } from 'node:path';
+import { isAbsolute, join, normalize } from 'node:path';
 
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
 import {
@@ -9,11 +9,13 @@ import {
   detectPackageManager,
   formatFiles,
   generateFiles,
+  getProjects,
   installPackagesTask,
   isWorkspacesEnabled,
   joinPathFragments,
   logger,
   names,
+  readJson,
   updateJson,
   workspaceRoot,
 } from '@nx/devkit';
@@ -440,12 +442,20 @@ export async function generateNxProject({
   const generateOutputs: Output[] = ['{options.outputPath}'];
   const generateOutputPath = `./src/${CONSTANTS.GENERATED_DIR_NAME}`;
 
+  const dependsOnProject = await getProjectThatSpecIsIn(tree, specFile);
+  if (dependsOnProject) {
+    logger.debug(
+      `Setting ${dependsOnProject} as an implicit dependency because the spec file is in that project.`,
+    );
+  }
+
   // Create basic project structure
   addProjectConfiguration(tree, `${projectScope}/${projectName}`, {
     projectType: 'library',
     root: projectRoot,
     sourceRoot: `{projectRoot}/src`,
     tags: tagArray,
+    implicitDependencies: dependsOnProject ? [dependsOnProject] : [],
     targets: {
       build: {
         dependsOn: ['updateApi'],
@@ -817,4 +827,37 @@ export function updateTsConfig({
     logger.error(`Failed to update ${tsconfigName}: ${errorMessage}.`);
     throw error;
   }
+}
+
+/**
+ * Get the project that the spec file is in, if the spec file is in the root then do not return anything,
+ * if the spec file is in a subdirectory then return the project that the subdirectory is in
+ * @param tree - The tree to get the project from
+ * @param specFile - The spec file to get the project from
+ * @returns The project that the spec file is in
+ */
+export async function getProjectThatSpecIsIn(tree: Tree, specFile: string) {
+  const projects = getProjects(tree);
+  for (const project of projects.values()) {
+    if (
+      project.sourceRoot &&
+      normalize(specFile).startsWith(normalize(project.sourceRoot))
+    ) {
+      const projectJsonName = project.name;
+      if (projectJsonName) {
+        return projectJsonName;
+      }
+      const packageJsonPath = join(project.root, 'package.json');
+      const packageJson = readJson(tree, packageJsonPath);
+      const projectName = packageJson.name;
+      if (!projectName) {
+        throw new Error('No name found in package.json.');
+      } else if (typeof projectName === 'string') {
+        logger.debug('Provided spec file is in project: ', projectName);
+        return projectName;
+      }
+      throw new Error('Project name is not a valid string.');
+    }
+  }
+  return null;
 }
