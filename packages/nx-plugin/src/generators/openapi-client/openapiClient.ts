@@ -458,13 +458,9 @@ export async function generateNxProject({
     implicitDependencies: dependsOnProject ? [dependsOnProject] : [],
     targets: {
       build: {
-        dependsOn: ['updateApi'],
+        dependsOn: ['^build', 'updateApi'],
         executor: '@nx/js:tsc',
-        inputs: [
-          { dependentTasksOutputFiles: '**/*.ts' },
-          '^build',
-          ...baseInputs,
-        ],
+        inputs: [{ dependentTasksOutputFiles: '**/*.ts' }, ...baseInputs],
         options: {
           additionalEntryPoints,
           assets: [
@@ -501,6 +497,7 @@ export async function generateNxProject({
       // this adds the update-api executor to the generated project
       updateApi: {
         cache: true,
+        dependsOn: ['^build'],
         executor: `${packageJson.name}:update-api`,
         inputs: updateInputs,
         options: buildUpdateOptions(normalizedOptions),
