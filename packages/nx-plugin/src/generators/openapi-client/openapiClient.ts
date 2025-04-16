@@ -422,7 +422,9 @@ export async function generateNxProject({
     '{projectRoot}/openapi-ts.config.ts',
   ];
 
-  const updateInputs: Input[] = [...baseInputs];
+  const dependentTasksOutputFiles = '**/*.{ts,json,yml,yaml}';
+
+  const updateInputs: Input[] = [{ dependentTasksOutputFiles }, ...baseInputs];
 
   if (specIsAFile) {
     // if the spec file is a file then we need to add it to inputs so that it is watched by NX
@@ -460,7 +462,7 @@ export async function generateNxProject({
       build: {
         dependsOn: ['^build', 'updateApi'],
         executor: '@nx/js:tsc',
-        inputs: [{ dependentTasksOutputFiles: '**/*.ts' }, ...baseInputs],
+        inputs: [{ dependentTasksOutputFiles }, ...baseInputs],
         options: {
           additionalEntryPoints,
           assets: [
