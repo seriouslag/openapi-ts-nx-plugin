@@ -242,8 +242,9 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.debug(`Error details: ${errorMessage}.`);
-    await cleanup(absoluteTempFolder);
     return { success: false };
+  } finally {
+    await cleanup(absoluteTempFolder);
   }
 };
 
