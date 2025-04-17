@@ -66,12 +66,12 @@ describe('utils', () => {
       const command = generateClientCommand({
         clientType: '@hey-api/client-fetch',
         outputPath: './src/generated',
-        plugins: [],
+        plugins: ['@hey-api/typescript', '@hey-api/sdk'],
         specFile: './api/spec.yaml',
       });
 
       expect(command).toBe(
-        'npx @hey-api/openapi-ts -i ./api/spec.yaml -o ./src/generated -c @hey-api/client-fetch',
+        'npx @hey-api/openapi-ts -i ./api/spec.yaml -o ./src/generated -c @hey-api/client-fetch -p @hey-api/typescript,@hey-api/sdk',
       );
     });
 
@@ -141,7 +141,11 @@ describe('utils', () => {
       expect(createClient).toHaveBeenCalledWith({
         input: './api/spec.yaml',
         output: './src/generated',
-        plugins: ['@hey-api/client-fetch'],
+        plugins: [
+          '@hey-api/typescript',
+          '@hey-api/sdk',
+          '@hey-api/client-fetch',
+        ],
       });
     });
 

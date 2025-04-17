@@ -10,6 +10,8 @@ import {
 import { logger } from '@nx/devkit';
 import OpenApiDiff from 'openapi-diff';
 
+export type Plugin = string | { asClass: boolean; name: string };
+
 export function generateClientCommand({
   clientType,
   outputPath,
@@ -18,10 +20,10 @@ export function generateClientCommand({
 }: {
   clientType: string;
   outputPath: string;
-  plugins: string[];
+  plugins: Plugin[];
   specFile: string;
 }) {
-  return `npx @hey-api/openapi-ts -i ${specFile} -o ${outputPath} -c ${clientType}${plugins.length > 0 ? ` -p ${plugins.join(',')}` : ''}`;
+  return `npx @hey-api/openapi-ts -i ${specFile} -o ${outputPath} -c ${clientType}${plugins.length > 0 ? ` -p ${plugins.map(getPluginName).join(',')}` : ''}`;
 }
 
 /**
@@ -59,7 +61,7 @@ export async function generateClientCode({
 }: {
   clientType: string;
   outputPath: string;
-  plugins: string[];
+  plugins: Plugin[];
   specFile: string;
 }) {
   try {
@@ -67,13 +69,24 @@ export async function generateClientCode({
     await createClient({
       input: specFile,
       output: outputPath,
-      plugins: [clientType, ...plugins] as ClientConfig['plugins'],
+      plugins: [
+        '@hey-api/typescript',
+        '@hey-api/sdk',
+        clientType,
+      ] as ClientConfig['plugins'],
     });
     logger.info(`Generated client code successfully.`);
   } catch (error) {
     logger.error(`Failed to generate client code: ${error}`);
     throw error;
   }
+}
+
+export function getPluginName(plugin: Plugin) {
+  if (typeof plugin === 'string') {
+    return plugin;
+  }
+  return plugin.name;
 }
 
 /**
@@ -87,7 +100,7 @@ export async function bundleAndDereferenceSpecFile({
 }: {
   client: string;
   outputPath: string;
-  plugins: string[];
+  plugins: Plugin[];
   specPath: string;
 }) {
   try {

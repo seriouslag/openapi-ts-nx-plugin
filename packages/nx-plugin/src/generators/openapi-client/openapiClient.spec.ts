@@ -78,7 +78,7 @@ describe('openapi-client generator', () => {
       expect(normalized).toEqual({
         clientType: '@hey-api/client-fetch',
         isPrivate: true,
-        plugins: [],
+        plugins: ['@hey-api/typescript', '@hey-api/sdk'],
         projectDirectory: `${tempDirectory}/test-api-${uuid}`,
         projectName: 'test-api',
         projectRoot: `${tempDirectory}/test-api-${uuid}/test-api`,
@@ -107,7 +107,7 @@ describe('openapi-client generator', () => {
       expect(normalized).toEqual({
         clientType: '@hey-api/client-fetch',
         isPrivate: true,
-        plugins: [],
+        plugins: ['@hey-api/typescript', '@hey-api/sdk'],
         projectDirectory: 'custom-dir',
         projectName: 'test-api',
         projectRoot: 'custom-dir/test-api',

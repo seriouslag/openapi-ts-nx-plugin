@@ -6,7 +6,7 @@ export interface UpdateApiExecutorSchema {
    */
   force?: boolean;
   name: string;
-  plugins: string[];
+  plugins: Plugin[];
   scope: string;
   spec: string;
   /**
