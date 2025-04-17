@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { mkdir, rm } from 'node:fs/promises';
-import { isAbsolute, join, normalize } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
 import {
@@ -444,7 +444,11 @@ export async function generateNxProject({
   const generateOutputs: Output[] = ['{options.outputPath}'];
   const generateOutputPath = `./src/${CONSTANTS.GENERATED_DIR_NAME}`;
 
-  const dependsOnProject = await getProjectThatSpecIsIn(tree, specFile);
+  // if the spec file is remote then we don't need to depend on a project
+  // otherwise we need to get the project that the spec file is in (if it is in a project)
+  const dependsOnProject = isSpecRemote
+    ? undefined
+    : await getProjectThatSpecIsIn(tree, specFile);
   if (dependsOnProject) {
     logger.debug(
       `Setting ${dependsOnProject} as an implicit dependency because the spec file is in that project.`,
@@ -838,8 +842,8 @@ export function updateTsConfig({
 export async function getProjectThatSpecIsIn(tree: Tree, specFile: string) {
   const projects = getProjects(tree);
   for (const project of projects.values()) {
-    const normalizedSpecFile = normalize(specFile);
-    const normalizedProjectRoot = normalize(project.root);
+    const normalizedSpecFile = resolve(specFile);
+    const normalizedProjectRoot = resolve(project.root);
     // if the spec file is under the project root then return the project name
     if (normalizedSpecFile.startsWith(normalizedProjectRoot)) {
       const projectJsonName = project.name;
