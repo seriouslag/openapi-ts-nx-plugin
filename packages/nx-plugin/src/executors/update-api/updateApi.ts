@@ -160,7 +160,6 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       logger.info('No changes detected in the API spec.');
       if (!force) {
         logger.info('Force flag is false. Skipping client code generation.');
-        await cleanup(absoluteTempFolder);
         return { success: true };
       } else {
         logger.info('Force flag is true. Generating new client code...');
@@ -237,7 +236,6 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     });
 
     logger.info('Successfully updated API client and spec files.');
-    await cleanup(absoluteTempFolder);
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
