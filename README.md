@@ -1,10 +1,18 @@
-# TestPlugin
+![NPM Version](https://img.shields.io/npm/v/%40seriouslag%2Fnx-openapi-ts-plugin?link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40seriouslag%2Fnx-openapi-ts-plugin)
+
+# @seriouslag/openapi-ts-nx-plugin
+
+![NPM Version](https://img.shields.io/npm/v/%40seriouslag%2Fnx-openapi-ts-plugin?link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40seriouslag%2Fnx-openapi-ts-plugin)
+
 
 <a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+This repo to to develop and test the [@seriouslag/nx-openapi-ts-plugin](https://www.npmjs.com/package/@seriouslag/nx-openapi-ts-plugin)
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/tutorials/react-monorepo-tutorial?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+The package is a NX plugin that assits with the automation of generating NX projects to a workspace based off an OpenAPI spec file.
+Under the hood it uses [@hey-api/openapi-ts](https://github.com/hey-api/openapi-ts) to generate client code from the OpenAPI spec file.
+
+This plugin helps generate packages to be linked correctly in the NX environment and to provide executors to update the client code when an change in the spec file is detected.
 
 ## install dependencies
 
