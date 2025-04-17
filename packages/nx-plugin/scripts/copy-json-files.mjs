@@ -21,6 +21,8 @@ function ensureDirectoryExists(dirPath) {
   }
 }
 
+const fileTypesToCopy = ['.json', '.yml', '.yaml', '.md'];
+
 /**
  * Recursively copies JSON files from a source directory to a target directory.
  * @param {string} sourceDir
@@ -39,7 +41,10 @@ function copyJsonFiles(sourceDir, targetDir) {
     if (stats.isDirectory()) {
       // Recursively copy JSON files from subdirectories
       copyJsonFiles(sourcePath, targetPath);
-    } else if (stats.isFile() && extname(item).toLowerCase() === '.json') {
+    } else if (
+      stats.isFile() &&
+      fileTypesToCopy.includes(extname(item).toLocaleLowerCase())
+    ) {
       // Copy JSON files
       ensureDirectoryExists(dirname(targetPath));
       copyFileSync(sourcePath, targetPath);
