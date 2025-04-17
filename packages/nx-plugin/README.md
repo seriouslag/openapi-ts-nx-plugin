@@ -1,4 +1,4 @@
-# @hey-api/nx-plugin
+# @seriouslag/nx-openapi-ts-plugin
 
 This plugin provides a generator and executor for generating and updating OpenAPI clients using the `@hey-api/openapi-ts` library. This can be tied in to automation and CI workflows to ensure your API clients are always up to date.
 
@@ -59,4 +59,7 @@ Run `nx run @my-org/my-generated-package:updateApi`
 
 ###### Spec File Notes
 
-If the spec file is a relative path and is located in
+If the spec file is a relative path and is located in the workspace then the containing project will be listed as an implicit dependency.
+The assumption is made that that project will generate the API spec file on build.
+
+If the spec file is a URL then we fetch the spec during cache checks to determine if we should rebuild the client code.
