@@ -18,12 +18,11 @@ pnpm install
 # run the generator to generate a package
 npx nx run @seriouslag/nx-openapi-ts-plugin:build && nx g @seriouslag/nx-openapi-ts-plugin:openapi-client pokemon-api --directory ./packages --scope @test-api --client @hey-api/client-fetch --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml --plugins @tanstack/react-query  --private false --verbose
 
-# install the dependencies and link the new package
-pnpm install
+# Install will happen automatically after new package is generated
 
 # runs the executor to update the generated package
 npx nx run @test-api/pokemon-api:updateApi
-# There should be no update since the spec is the same
+# There will be no update since the spec is the same
 # This result will be cached by nx, for a new result the API spec file must change or the `--skip-nx-cache --force` flags must be used
 
 # to test an update: Ether change the source spec file or make a change to one of the routes paths in the cached spec file located at ./packages/pokemon-api/src/spec.yaml

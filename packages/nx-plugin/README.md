@@ -14,7 +14,7 @@ npm install -D @seriouslag/plugin-nx
 
 #### openapi-client
 
-[Docs](src/generators/openapi-client/README.md)
+[Docs](./src/generators/openapi-client/README.md)
 
 This plugin provides a generator for generating OpenAPI clients using the `@hey-api/openapi-ts` library.
 
@@ -56,3 +56,7 @@ Run `nx run @my-org/my-generated-package:updateApi`
 - `client`: The type of client to generate. [ string ] (optional) (default: `@hey-api/client-fetch`)
 - `directory`: The directory to create the project in. [ string ] (optional) (default: `libs`)
 - `plugins`: Additional plugins to provide to the client api. [ string[] ] (optional) (default:[])
+
+###### Spec File Notes
+
+If the spec file is a relative path and is located in
