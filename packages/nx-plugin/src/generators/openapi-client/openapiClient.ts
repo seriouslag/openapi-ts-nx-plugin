@@ -803,13 +803,19 @@ export async function updatePackageJson({
   );
 
   if (!isWorkspacesEnabled(detectPackageManager(workspaceRoot))) {
-    // if workspaces are not enabled then we need to install the dependencies to the root
-    addDependenciesToPackageJson(
-      tree,
-      deps,
-      {},
-      join(workspaceRoot, 'package.json'),
-    );
+    if (tree.exists(join(workspaceRoot, 'package.json'))) {
+      // if workspaces are not enabled then we need to install the dependencies to the root
+      addDependenciesToPackageJson(
+        tree,
+        deps,
+        {},
+        join(workspaceRoot, 'package.json'),
+      );
+    } else {
+      logger.warn(
+        'Could not add dependencies to root package.json. Packages may needed to be added manually.',
+      );
+    }
   }
 
   // update the private and publishConfig field in the package.json file
