@@ -329,7 +329,10 @@ export function normalizeOptions(
       ).map((s) => s.trim()),
     ),
   );
-  const tempFolder = options.tempFolderDir ?? defaultTempFolder;
+  // use the provided temp folder or use the default temp folder and append the project name to it
+  // we append the project name to the temp folder to avoid conflicts between different projects using the same temp folder
+  const tempFolder =
+    options.tempFolderDir ?? join(defaultTempFolder, projectName);
   const [default1, default2, ...rest] = defaultPlugins;
   logger.debug('As Class', options.asClass);
   const plugins = [

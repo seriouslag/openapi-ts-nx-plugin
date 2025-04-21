@@ -1,9 +1,10 @@
 import { existsSync, writeFileSync } from 'node:fs';
-import { cp, mkdir, readFile, rm } from 'node:fs/promises';
+import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { PromiseExecutor } from '@nx/devkit';
-import { logger } from '@nx/devkit';
+import { logger, names } from '@nx/devkit';
+import { format } from 'prettier';
 
 import {
   bundleAndDereferenceSpecFile,
@@ -129,7 +130,11 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   _context,
 ) => {
-  const tempFolder = options.tempFolder ?? CONSTANTS.TMP_DIR_NAME;
+  const tempFolder =
+    // use the provided temp folder or use the default temp folder and append the project name to it
+    // we append the project name to the temp folder to avoid conflicts between different projects using the same temp folder
+    options.tempFolder ??
+    join(CONSTANTS.TMP_DIR_NAME, names(options.name).fileName);
   const absoluteTempFolder = join(process.cwd(), tempFolder);
   const force = options.force ?? false;
 
@@ -200,7 +205,10 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       } else {
         logger.debug('No existing spec file found. Creating...');
       }
-      writeFileSync(absoluteExistingSpecPath, newSpecString);
+      const formattedSpec = await format(newSpecString, {
+        parser: 'yaml',
+      });
+      writeFileSync(absoluteExistingSpecPath, formattedSpec);
       logger.debug(`Spec file updated successfully`);
     } else {
       logger.error(
@@ -234,6 +242,26 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     await cp(absoluteGeneratedTempDir, absoluteProjectGeneratedDir, {
       recursive: true,
     });
+
+    logger.debug('Formatting generated directory...');
+    const formatFiles = async (dir: string) => {
+      const files = await readdir(dir, { withFileTypes: true });
+      const tasks = files.map(async (file) => {
+        const filePath = join(dir, file.name);
+        if (file.isDirectory()) {
+          await formatFiles(filePath);
+        } else if (file.name.endsWith('.ts')) {
+          logger.debug(`Formatting ${filePath}...`);
+          const content = await readFile(filePath, 'utf-8');
+          const formatted = await format(content, {
+            parser: 'typescript',
+          });
+          await writeFile(filePath, formatted);
+        }
+      });
+      await Promise.all(tasks);
+    };
+    await formatFiles(absoluteProjectGeneratedDir);
 
     logger.info('Successfully updated API client and spec files.');
     return { success: true };
