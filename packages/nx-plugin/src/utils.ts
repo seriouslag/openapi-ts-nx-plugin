@@ -65,15 +65,13 @@ export async function generateClientCode({
   specFile: string;
 }) {
   try {
+    const pluginNames = plugins.map(getPluginName);
     logger.info(`Generating client code using spec file...`);
+
     await createClient({
       input: specFile,
       output: outputPath,
-      plugins: [
-        '@hey-api/typescript',
-        '@hey-api/sdk',
-        clientType,
-      ] as ClientConfig['plugins'],
+      plugins: [clientType, ...pluginNames] as ClientConfig['plugins'],
     });
     logger.info(`Generated client code successfully.`);
   } catch (error) {
