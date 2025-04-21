@@ -133,7 +133,7 @@ describe('utils', () => {
         generateClientCode({
           clientType: '@hey-api/client-fetch',
           outputPath: './src/generated',
-          plugins: [],
+          plugins: ['@hey-api/typescript', '@hey-api/sdk'],
           specFile: './api/spec.yaml',
         }),
       ).resolves.not.toThrow();
@@ -142,9 +142,9 @@ describe('utils', () => {
         input: './api/spec.yaml',
         output: './src/generated',
         plugins: [
+          '@hey-api/client-fetch',
           '@hey-api/typescript',
           '@hey-api/sdk',
-          '@hey-api/client-fetch',
         ],
       });
     });
@@ -158,7 +158,7 @@ describe('utils', () => {
         generateClientCode({
           clientType: '@hey-api/client-fetch',
           outputPath: './src/generated',
-          plugins: [],
+          plugins: ['@hey-api/typescript', '@hey-api/sdk'],
           specFile: './api/spec.yaml',
         }),
       ).rejects.toThrow('Command failed');
