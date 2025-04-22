@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from 'node:fs';
-import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { PromiseExecutor } from '@nx/devkit';
@@ -9,6 +9,7 @@ import { format } from 'prettier';
 import {
   bundleAndDereferenceSpecFile,
   compareSpecs,
+  formatFiles,
   generateClientCode,
   makeDir,
 } from '../../utils';
@@ -166,6 +167,7 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       logger.info('No changes detected in the API spec.');
       if (!force) {
         logger.info('Force flag is false. Skipping client code generation.');
+        await cleanup(absoluteTempFolder);
         return { success: true };
       } else {
         logger.info('Force flag is true. Generating new client code...');
@@ -245,33 +247,16 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     });
 
     logger.debug('Formatting generated directory...');
-    const formatFiles = async (dir: string) => {
-      const files = await readdir(dir, { withFileTypes: true });
-      const tasks = files.map(async (file) => {
-        const filePath = join(dir, file.name);
-        if (file.isDirectory()) {
-          await formatFiles(filePath);
-        } else if (file.name.endsWith('.ts')) {
-          logger.debug(`Formatting ${filePath}...`);
-          const content = await readFile(filePath, 'utf-8');
-          const formatted = await format(content, {
-            parser: 'typescript',
-          });
-          await writeFile(filePath, formatted);
-        }
-      });
-      await Promise.all(tasks);
-    };
     await formatFiles(absoluteProjectGeneratedDir);
 
     logger.info('Successfully updated API client and spec files.');
+    await cleanup(absoluteTempFolder);
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.debug(`Error details: ${errorMessage}.`);
-    return { success: false };
-  } finally {
     await cleanup(absoluteTempFolder);
+    return { success: false, error: errorMessage };
   }
 };
 
