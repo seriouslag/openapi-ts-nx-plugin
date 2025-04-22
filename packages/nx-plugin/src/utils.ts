@@ -331,7 +331,6 @@ export async function formatFiles(dir: string) {
     if (file.isDirectory()) {
       await formatFiles(filePath);
     } else if (file.name.endsWith('.ts')) {
-      logger.debug(`Formatting ${filePath}...`);
       const content = await readFile(filePath, 'utf-8');
       const formatted = await format(content, {
         parser: 'typescript',

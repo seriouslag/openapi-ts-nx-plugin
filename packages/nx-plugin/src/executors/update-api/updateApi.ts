@@ -235,10 +235,16 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
 
     // Remove old generated directory if it exists
     if (existsSync(absoluteProjectGeneratedDir)) {
+      logger.debug(
+        `Removing old generated directory: ${absoluteProjectGeneratedDir}`,
+      );
       await rm(absoluteProjectGeneratedDir, {
         force: true,
         recursive: true,
       });
+      logger.debug(
+        `Old generated directory removed successfully: ${absoluteProjectGeneratedDir}`,
+      );
     }
 
     // Copy new generated directory
@@ -254,18 +260,22 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     return { success: true };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
-    logger.debug(`Error details: ${errorMessage}.`);
+    logger.error(`Error details: ${errorMessage}.`);
     await cleanup(absoluteTempFolder);
     return { success: false, error: errorMessage };
   }
 };
 
 async function cleanup(tempFolder: string) {
+  logger.debug('Cleaning up executor environment...');
   const absoluteTempFolder = join(process.cwd(), tempFolder);
 
   if (existsSync(absoluteTempFolder)) {
+    logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
     await rm(absoluteTempFolder, { force: true, recursive: true });
+    logger.debug(`Temp folder removed successfully: ${absoluteTempFolder}`);
   }
+  logger.debug('Executor environment cleaned up successfully');
 }
 
 export default runExecutor;
