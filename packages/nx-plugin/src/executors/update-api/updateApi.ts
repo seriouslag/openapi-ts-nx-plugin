@@ -266,16 +266,19 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
   }
 };
 
-async function cleanup(tempFolder: string) {
+async function cleanup(absoluteTempFolder: string) {
   logger.debug('Cleaning up executor environment...');
-  const absoluteTempFolder = join(process.cwd(), tempFolder);
 
   if (existsSync(absoluteTempFolder)) {
     logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
     await rm(absoluteTempFolder, { force: true, recursive: true });
     logger.debug(`Temp folder removed successfully: ${absoluteTempFolder}`);
+  } else {
+    logger.debug(
+      `Temp folder does not exist: ${absoluteTempFolder}. Skipping cleanup.`,
+    );
   }
-  logger.debug('Executor environment cleaned up successfully');
+  logger.debug('Executor  cleaned up successfully.');
 }
 
 export default runExecutor;
