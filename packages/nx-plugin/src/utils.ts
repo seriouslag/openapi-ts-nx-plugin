@@ -9,7 +9,9 @@ import {
 } from '@hey-api/openapi-ts/internal';
 import { logger } from '@nx/devkit';
 import OpenApiDiff from 'openapi-diff';
-import { mkdir } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { format } from 'prettier';
 
 export type Plugin = string | { asClass: boolean; name: string };
 
@@ -320,4 +322,22 @@ export function isAFile(isFileSystemFile: string) {
  */
 export async function makeDir(path: string) {
   await mkdir(path, { recursive: true });
+}
+
+export async function formatFiles(dir: string) {
+  const files = await readdir(dir, { withFileTypes: true });
+  const tasks = files.map(async (file) => {
+    const filePath = join(dir, file.name);
+    if (file.isDirectory()) {
+      await formatFiles(filePath);
+    } else if (file.name.endsWith('.ts')) {
+      logger.debug(`Formatting ${filePath}...`);
+      const content = await readFile(filePath, 'utf-8');
+      const formatted = await format(content, {
+        parser: 'typescript',
+      });
+      await writeFile(filePath, formatted);
+    }
+  });
+  await Promise.all(tasks);
 }
