@@ -9,6 +9,7 @@ import {
 } from '@hey-api/openapi-ts/internal';
 import { logger } from '@nx/devkit';
 import OpenApiDiff from 'openapi-diff';
+import { mkdir } from 'node:fs/promises';
 
 export type Plugin = string | { asClass: boolean; name: string };
 
@@ -312,4 +313,11 @@ export function isAFile(isFileSystemFile: string) {
     return false;
   }
   return existsSync(isFileSystemFile) && lstatSync(isFileSystemFile).isFile();
+}
+
+/**
+ * Creates a directory if it does not exist
+ */
+export async function makeDir(path: string) {
+  await mkdir(path, { recursive: true });
 }

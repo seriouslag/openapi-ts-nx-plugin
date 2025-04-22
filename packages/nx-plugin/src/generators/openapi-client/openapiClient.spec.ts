@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { initConfigs } from '@hey-api/openapi-ts/internal';
@@ -7,7 +7,7 @@ import { readJson } from '@nx/devkit';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getGeneratorOptions } from '../../test-utils';
-import { generateClientCode } from '../../utils';
+import { generateClientCode, makeDir } from '../../utils';
 import generator, { updateTsConfig } from './openapiClient';
 import {
   generateApi,
@@ -330,7 +330,7 @@ describe('openapi-client generator', () => {
       // Create necessary directories
       const fullProjectRoot = join(process.cwd(), projectRoot);
       if (!existsSync(fullProjectRoot)) {
-        mkdirSync(fullProjectRoot, { recursive: true });
+        await makeDir(fullProjectRoot);
       }
 
       await expect(

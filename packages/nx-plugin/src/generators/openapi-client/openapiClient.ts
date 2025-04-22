@@ -1,5 +1,5 @@
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { mkdir, rm } from 'node:fs/promises';
+import { existsSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
@@ -32,6 +32,7 @@ import {
   getVersionOfPackage,
   isAFile,
   isUrl,
+  makeDir,
   Plugin,
 } from '../../utils';
 import { CONSTANTS } from '../../vars';
@@ -206,7 +207,7 @@ export default async function (
     // Create the temp folder
     if (!existsSync(tempFolder)) {
       logger.debug(`Creating temp folder: ${tempFolder}`);
-      await mkdir(tempFolder);
+      await makeDir(tempFolder);
     } else {
       logger.debug(`Temp folder already exists: ${tempFolder}`);
     }
@@ -704,7 +705,7 @@ export async function generateApi({
     // Read the bundled file back into the tree
     try {
       // write to temp spec destination
-      mkdirSync(absoluteSpecDestination, { recursive: true });
+      await makeDir(absoluteSpecDestination);
       writeFileSync(absoluteTempSpecDestination, dereferencedSpecString);
       logger.debug(
         `Dereferenced spec written to temp file: ${absoluteTempSpecDestination}`,

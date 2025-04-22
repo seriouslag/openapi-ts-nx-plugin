@@ -1,5 +1,5 @@
 import { existsSync, writeFileSync } from 'node:fs';
-import { cp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { cp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { PromiseExecutor } from '@nx/devkit';
@@ -10,6 +10,7 @@ import {
   bundleAndDereferenceSpecFile,
   compareSpecs,
   generateClientCode,
+  makeDir,
 } from '../../utils';
 import { CONSTANTS } from '../../vars';
 import type { UpdateApiExecutorSchema } from './schema';
@@ -41,7 +42,7 @@ async function setup({
 
   if (!existsSync(absoluteTempApiFolder)) {
     logger.debug(`Creating executor temp api folder: ${absoluteTempApiFolder}`);
-    await mkdir(absoluteTempApiFolder, { recursive: true });
+    await makeDir(absoluteTempApiFolder);
     logger.debug(`Created temp API folder: ${absoluteTempApiFolder}`);
   } else {
     logger.debug(`Temp API folder already exists: ${absoluteTempApiFolder}`);
@@ -180,7 +181,7 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
     const absoluteGeneratedTempDir = join(process.cwd(), generatedTempDir);
 
     if (!existsSync(absoluteGeneratedTempDir)) {
-      await mkdir(absoluteGeneratedTempDir);
+      await makeDir(absoluteGeneratedTempDir);
     }
 
     // Generate new client code
