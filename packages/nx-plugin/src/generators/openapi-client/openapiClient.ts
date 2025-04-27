@@ -2,6 +2,7 @@ import { existsSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
+import { defaultPlugins } from '@hey-api/openapi-ts';
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
 import {
   addDependenciesToPackageJson,
@@ -19,10 +20,10 @@ import {
   updateJson,
   workspaceRoot,
 } from '@nx/devkit';
-import { defaultPlugins } from '@hey-api/openapi-ts';
 
 import packageJson from '../../../package.json';
 import type { UpdateApiExecutorSchema } from '../../executors/update-api/schema';
+import type { Plugin } from '../../utils';
 import {
   bundleAndDereferenceSpecFile,
   generateClientCode,
@@ -33,7 +34,6 @@ import {
   isAFile,
   isUrl,
   makeDir,
-  Plugin,
 } from '../../utils';
 import { CONSTANTS } from '../../vars';
 
@@ -108,22 +108,26 @@ const testRunners: Record<
   TestRunner,
   {
     /**
-     * The template path to the test files
-     */
-    templatePath: string;
-    /**
      * Additional dev dependencies to be added to the project
      */
     additionalDevDependencies?: string[];
+    /**
+     * The template path to the test files
+     */
+    templatePath: string;
   }
 > = {
   vitest: {
-    templatePath: './tests/vitest',
     additionalDevDependencies: ['vite', 'vitest'],
+    templatePath: './tests/vitest',
   },
 };
 
 export interface OpenApiClientGeneratorSchema {
+  /**
+   * Whether to use the class style for the generated code, defaults to `false`
+   */
+  asClass?: boolean;
   /**
    * The client to use for the OpenAPI client
    */
@@ -165,10 +169,6 @@ export interface OpenApiClientGeneratorSchema {
    * The test runner to use for the project, defaults to `none`
    */
   test?: TestRunner | 'none';
-  /**
-   * Whether to use the class style for the generated code, defaults to `false`
-   */
-  asClass?: boolean;
 }
 
 export default async function (
@@ -340,8 +340,8 @@ export function normalizeOptions(
     default1,
     options.asClass
       ? {
-          name: default2,
           asClass: true,
+          name: default2,
         }
       : default2,
     ...rest,
@@ -381,10 +381,10 @@ export function buildSpecPath(specPath: string) {
 
 export function buildUpdateOptions({
   clientType,
+  plugins,
   projectDirectory,
   projectName,
   projectScope,
-  plugins,
   specFile,
 }: NormalizedOptions): UpdateApiExecutorSchema {
   const newSpecFilePath = buildSpecPath(specFile);
@@ -478,11 +478,11 @@ export async function generateNxProject({
 
   // Create basic project structure
   addProjectConfiguration(tree, `${projectScope}/${projectName}`, {
+    implicitDependencies: dependsOnProject ? [dependsOnProject] : [],
     projectType: 'library',
     root: projectRoot,
     sourceRoot: `{projectRoot}/src`,
     tags: tagArray,
-    implicitDependencies: dependsOnProject ? [dependsOnProject] : [],
     targets: {
       build: {
         dependsOn: ['^build', 'updateApi'],

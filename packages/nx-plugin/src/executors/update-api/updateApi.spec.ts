@@ -9,10 +9,10 @@ import { afterAll, describe, expect, it, vi } from 'vitest';
 
 import generator from '../../generators/openapi-client/openapiClient';
 import { getGeneratorOptions, TestOptions } from '../../test-utils';
-import { CONSTANTS } from '../../vars';
-import executor from './updateApi';
-import type { UpdateApiExecutorSchema } from './schema';
 import { makeDir } from '../../utils';
+import { CONSTANTS } from '../../vars';
+import type { UpdateApiExecutorSchema } from './schema';
+import executor from './updateApi';
 
 vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
   const actual =
