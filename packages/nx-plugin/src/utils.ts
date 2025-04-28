@@ -1,6 +1,6 @@
 import { existsSync, lstatSync } from 'node:fs';
 import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { basename, dirname, join, relative } from 'node:path';
 
 import type { JSONSchema } from '@hey-api/json-schema-ref-parser';
 import { createClient } from '@hey-api/openapi-ts';
@@ -282,22 +282,27 @@ export async function formatFiles(dir: string) {
 }
 
 export async function getBaseTsConfigPath({
+  projectRoot,
   baseTsConfigName,
   baseTsConfigPath,
 }: {
   /**
-   * The name of the base tsconfig file, use this if the base tsconfig file is in the workspace root,
+   * The root of the project, this is used to resolve the base tsconfig file.
+   */
+  projectRoot: string;
+  /**
+   * The name of the base tsconfig file that contains the compiler paths used to resolve the imports, use this if the base tsconfig file is in the workspace root,
    * if provided with a baseTsConfigPath then the baseTsConfigName will be added to the path.
    * DO not use this if the baseTsConfigPath is a file.
    */
   baseTsConfigName?: string;
   /**
-   * The path to the base tsconfig file, use this if the base tsconfig file is not in the workspace root.
+   * The path to the base tsconfig file that contains the compiler paths used to resolve the imports, use this if the base tsconfig file is not in the workspace root.
    * This can be a file or a directory. If it is a directory and the baseTsConfigName is provided then the baseTsConfigName will be added to the path.
    * If it is a file and the baseTsConfigName is provided then there will be an error.
    */
   baseTsConfigPath?: string;
-} = {}) {
+}) {
   const isTsConfigPathAFile =
     baseTsConfigPath && baseTsConfigPath.endsWith('.json');
 
@@ -313,7 +318,13 @@ export async function getBaseTsConfigPath({
     if (!existsSync(baseTsConfigPath)) {
       throw new Error(`Base tsconfig file ${baseTsConfigPath} does not exist.`);
     }
-    return baseTsConfigPath;
+    const resolvedTsConfig = relative(projectRoot, baseTsConfigPath);
+    const tsConfigName = basename(resolvedTsConfig);
+    const tsConfigDir = dirname(resolvedTsConfig);
+    return {
+      tsConfigDirectory: tsConfigDir,
+      tsConfigName,
+    };
   }
 
   const isTsConfigPathADirectory =
@@ -335,7 +346,13 @@ export async function getBaseTsConfigPath({
       ];
   for (const path of possiblePaths) {
     if (existsSync(path)) {
-      return path;
+      const resolvedTsConfig = relative(projectRoot, path);
+      const tsConfigName = basename(resolvedTsConfig);
+      const tsConfigDir = dirname(resolvedTsConfig);
+      return {
+        tsConfigDirectory: tsConfigDir,
+        tsConfigName,
+      };
     }
   }
   const message = `Failed to find base tsconfig file. If your project has a non standard tsconfig name then, pass in the path to the tsconfig file using the baseTsConfigPath option or the baseTsConfigName option.`;
