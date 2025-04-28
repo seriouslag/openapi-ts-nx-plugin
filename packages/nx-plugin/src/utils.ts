@@ -11,7 +11,7 @@ import {
 } from '@hey-api/openapi-ts/internal';
 import { logger, workspaceRoot } from '@nx/devkit';
 import { compareOpenApi } from 'api-smart-diff';
-import { format } from 'prettier';
+import { format, type Options as PrettierOptions } from 'prettier';
 
 import { CONSTANTS } from './vars';
 
@@ -264,16 +264,20 @@ export async function makeDir(path: string) {
   await mkdir(path, { recursive: true });
 }
 
-export async function formatFiles(dir: string) {
+export async function formatFiles(
+  dir: string,
+  prettierOptions?: PrettierOptions,
+) {
   const files = await readdir(dir, { withFileTypes: true });
   const tasks = files.map(async (file) => {
     const filePath = join(dir, file.name);
     if (file.isDirectory()) {
-      await formatFiles(filePath);
+      await formatFiles(filePath, prettierOptions);
     } else if (file.name.endsWith('.ts')) {
       const content = await readFile(filePath, 'utf-8');
       const formatted = await format(content, {
-        parser: 'typescript',
+        ...prettierOptions,
+        filepath: filePath,
       });
       await writeFile(filePath, formatted);
     }
