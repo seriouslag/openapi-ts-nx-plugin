@@ -1,6 +1,13 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
-import { isAbsolute, join, resolve } from 'node:path';
+import {
+  isAbsolute,
+  join,
+  relative,
+  resolve,
+  dirname,
+  basename,
+} from 'node:path';
 
 import { defaultPlugins } from '@hey-api/openapi-ts';
 import type { ProjectConfiguration, Tree } from '@nx/devkit';
@@ -28,6 +35,7 @@ import {
   bundleAndDereferenceSpecFile,
   generateClientCode,
   generateClientCommand,
+  getBaseTsConfigPath,
   getPackageName,
   getPluginName,
   getVersionOfPackage,
@@ -299,7 +307,11 @@ export interface NormalizedOptions {
   test: TestRunner | 'none';
 }
 
-export type GeneratedOptions = NormalizedOptions & typeof CONSTANTS;
+export type GeneratedOptions = NormalizedOptions &
+  typeof CONSTANTS & {
+    pathToTsConfig: string;
+    tsConfigName: string;
+  };
 
 type ProjectConfigurationTargets = NonNullable<ProjectConfiguration['targets']>;
 type ValueType<T extends Record<string, any>> = T[keyof T];
@@ -536,10 +548,16 @@ export async function generateNxProject({
     },
   });
 
+  const pathToTsConfig = await getBaseTsConfigPath();
+  const resolvedTsConfig = dirname(relative(projectRoot, pathToTsConfig));
+  const tsConfigName = basename(pathToTsConfig);
+
   const generatedOptions: GeneratedOptions = {
     ...normalizedOptions,
     ...CONSTANTS,
     plugins: plugins.map(getPluginName),
+    tsConfigName,
+    pathToTsConfig: resolvedTsConfig,
   };
 
   // Create directory structure

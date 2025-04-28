@@ -9,9 +9,11 @@ import {
   initConfigs,
   parseOpenApiSpec,
 } from '@hey-api/openapi-ts/internal';
-import { logger } from '@nx/devkit';
+import { logger, workspaceRoot } from '@nx/devkit';
 import { compareOpenApi } from 'api-smart-diff';
 import { format } from 'prettier';
+
+import { CONSTANTS } from './vars';
 
 export type Plugin = string | { asClass: boolean; name: string };
 
@@ -176,7 +178,10 @@ async function getSpecFile(path: string) {
 export async function getSpecFiles(
   existingSpecPath: string,
   newSpecPath: string,
-) {
+): Promise<{
+  existingSpec: JSONSchema;
+  newSpec: JSONSchema;
+}> {
   logger.debug('Loading spec files...');
   const parsedExistingSpecTask = getSpecFile(existingSpecPath);
   const parsedNewSpecTask = getSpecFile(newSpecPath);
@@ -274,4 +279,66 @@ export async function formatFiles(dir: string) {
     }
   });
   await Promise.all(tasks);
+}
+
+export async function getBaseTsConfigPath({
+  baseTsConfigName,
+  baseTsConfigPath,
+}: {
+  /**
+   * The name of the base tsconfig file, use this if the base tsconfig file is in the workspace root,
+   * if provided with a baseTsConfigPath then the baseTsConfigName will be added to the path.
+   * DO not use this if the baseTsConfigPath is a file.
+   */
+  baseTsConfigName?: string;
+  /**
+   * The path to the base tsconfig file, use this if the base tsconfig file is not in the workspace root.
+   * This can be a file or a directory. If it is a directory and the baseTsConfigName is provided then the baseTsConfigName will be added to the path.
+   * If it is a file and the baseTsConfigName is provided then there will be an error.
+   */
+  baseTsConfigPath?: string;
+} = {}) {
+  const isTsConfigPathAFile =
+    baseTsConfigPath && baseTsConfigPath.endsWith('.json');
+
+  // return the path if it is a file
+  if (isTsConfigPathAFile) {
+    if (baseTsConfigName) {
+      throw new Error(
+        `Base tsconfig name ${baseTsConfigName} is not allowed when baseTsConfigPath is a file, either provide a baseTsConfigPath as a directory with a tsconfig.json file or provide a baseTsConfigName.`,
+      );
+    }
+
+    // check if the file exists
+    if (!existsSync(baseTsConfigPath)) {
+      throw new Error(`Base tsconfig file ${baseTsConfigPath} does not exist.`);
+    }
+    return baseTsConfigPath;
+  }
+
+  const isTsConfigPathADirectory =
+    baseTsConfigPath && lstatSync(baseTsConfigPath).isDirectory();
+
+  if (!isTsConfigPathADirectory && baseTsConfigPath) {
+    throw new Error(
+      `Base tsconfig path ${baseTsConfigPath} is not a directory or a file.`,
+    );
+  }
+
+  const pathToUse = isTsConfigPathADirectory ? baseTsConfigPath : workspaceRoot;
+
+  const possiblePaths = baseTsConfigName
+    ? [join(pathToUse, baseTsConfigName)]
+    : [
+        join(pathToUse, CONSTANTS.TS_BASE_CONFIG_NAME),
+        join(pathToUse, 'tsconfig.json'),
+      ];
+  for (const path of possiblePaths) {
+    if (existsSync(path)) {
+      return path;
+    }
+  }
+  const message = `Failed to find base tsconfig file. If your project has a non standard tsconfig name then, pass in the path to the tsconfig file using the baseTsConfigPath option or the baseTsConfigName option.`;
+  logger.error(message);
+  throw new Error(message);
 }
