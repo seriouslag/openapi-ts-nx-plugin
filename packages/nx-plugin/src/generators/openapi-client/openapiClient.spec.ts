@@ -76,6 +76,8 @@ describe('openapi-client generator', () => {
       const normalized = normalizeOptions(options);
 
       expect(normalized).toEqual({
+        baseTsConfigName: undefined,
+        baseTsConfigPath: undefined,
         clientType: '@hey-api/client-fetch',
         isPrivate: true,
         plugins: ['@hey-api/typescript', '@hey-api/sdk'],
@@ -87,8 +89,6 @@ describe('openapi-client generator', () => {
         tagArray: ['api', 'openapi'],
         tempFolder: options.tempFolderDir,
         test: 'none',
-        baseTsConfigName: undefined,
-        baseTsConfigPath: undefined,
       });
     });
 
@@ -107,6 +107,8 @@ describe('openapi-client generator', () => {
       const normalized = normalizeOptions(customOptions);
 
       expect(normalized).toEqual({
+        baseTsConfigName: undefined,
+        baseTsConfigPath: undefined,
         clientType: '@hey-api/client-fetch',
         isPrivate: true,
         plugins: ['@hey-api/typescript', '@hey-api/sdk'],
@@ -118,8 +120,6 @@ describe('openapi-client generator', () => {
         tagArray: ['custom', 'tags'],
         tempFolder: options.tempFolderDir,
         test: 'none',
-        baseTsConfigName: undefined,
-        baseTsConfigPath: undefined,
       });
     });
   });

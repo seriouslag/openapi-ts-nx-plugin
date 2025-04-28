@@ -11,11 +11,11 @@ import {
   bundleAndDereferenceSpecFile,
   generateClientCode,
   generateClientCommand,
+  getBaseTsConfigPath,
   getPackageName,
   getVersionOfPackage,
   isAFile,
   isUrl,
-  getBaseTsConfigPath,
 } from './utils';
 
 vi.mock('node:fs', () => ({
@@ -304,7 +304,7 @@ paths:
       const { tsConfigDirectory, tsConfigName } = await getBaseTsConfigPath({
         projectRoot,
       });
-      expect(tsConfigDirectory).toBe('../../..');
+      expect(join(tsConfigDirectory)).toBe(join('../../..'));
       expect(tsConfigName).toBe('tsconfig.base.json');
     });
 
@@ -319,7 +319,7 @@ paths:
       const { tsConfigDirectory, tsConfigName } = await getBaseTsConfigPath({
         projectRoot,
       });
-      expect(tsConfigDirectory).toBe('../../..');
+      expect(join(tsConfigDirectory)).toBe(join('../../..'));
       expect(tsConfigName).toBe('tsconfig.json');
     });
 
@@ -333,7 +333,7 @@ paths:
         baseTsConfigPath: mockPath,
         projectRoot,
       });
-      expect(tsConfigDirectory).toBe('..');
+      expect(join(tsConfigDirectory)).toBe(join('..'));
       expect(tsConfigName).toBe('tsconfig.json');
     });
 
@@ -345,8 +345,8 @@ paths:
 
       await expect(
         getBaseTsConfigPath({
-          baseTsConfigPath: mockPath,
           baseTsConfigName: 'tsconfig.json',
+          baseTsConfigPath: mockPath,
           projectRoot,
         }),
       ).rejects.toThrow('Base tsconfig name');
@@ -390,11 +390,11 @@ paths:
       vi.mocked(lstatSync).mockReturnValue({ isDirectory: () => true } as any);
 
       const { tsConfigDirectory, tsConfigName } = await getBaseTsConfigPath({
-        baseTsConfigPath: mockPath,
         baseTsConfigName: mockConfigName,
+        baseTsConfigPath: mockPath,
         projectRoot,
       });
-      expect(tsConfigDirectory).toBe('../dir');
+      expect(join(tsConfigDirectory)).toBe(join('../dir'));
       expect(tsConfigName).toBe(mockConfigName);
     });
 
@@ -410,7 +410,7 @@ paths:
         baseTsConfigPath: mockPath,
         projectRoot,
       });
-      expect(tsConfigDirectory).toBe('../dir');
+      expect(join(tsConfigDirectory)).toBe(join('../dir'));
       expect(tsConfigName).toBe('tsconfig.json');
     });
 

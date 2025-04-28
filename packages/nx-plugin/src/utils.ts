@@ -178,10 +178,7 @@ async function getSpecFile(path: string) {
 export async function getSpecFiles(
   existingSpecPath: string,
   newSpecPath: string,
-): Promise<{
-  existingSpec: JSONSchema;
-  newSpec: JSONSchema;
-}> {
+) {
   logger.debug('Loading spec files...');
   const parsedExistingSpecTask = getSpecFile(existingSpecPath);
   const parsedNewSpecTask = getSpecFile(newSpecPath);
@@ -286,14 +283,10 @@ export async function formatFiles(
 }
 
 export async function getBaseTsConfigPath({
-  projectRoot,
   baseTsConfigName,
   baseTsConfigPath,
+  projectRoot,
 }: {
-  /**
-   * The root of the project, this is used to resolve the base tsconfig file.
-   */
-  projectRoot: string;
   /**
    * The name of the base tsconfig file that contains the compiler paths used to resolve the imports, use this if the base tsconfig file is in the workspace root,
    * if provided with a baseTsConfigPath then the baseTsConfigName will be added to the path.
@@ -306,6 +299,10 @@ export async function getBaseTsConfigPath({
    * If it is a file and the baseTsConfigName is provided then there will be an error.
    */
   baseTsConfigPath?: string;
+  /**
+   * The root of the project, this is used to resolve the base tsconfig file.
+   */
+  projectRoot: string;
 }) {
   const isTsConfigPathAFile =
     baseTsConfigPath && baseTsConfigPath.endsWith('.json');

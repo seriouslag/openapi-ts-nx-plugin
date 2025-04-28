@@ -6,8 +6,8 @@ import type { PromiseExecutor } from '@nx/devkit';
 import { logger, names, workspaceRoot } from '@nx/devkit';
 import {
   format,
-  resolveConfig,
   type Options as PrettierOptions,
+  resolveConfig,
 } from 'prettier';
 
 import {
