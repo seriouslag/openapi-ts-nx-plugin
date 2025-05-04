@@ -19,7 +19,7 @@
         "rootDir": "{projectRoot}/src",
         "assets": [
           {
-            "glob": "**/*.json",
+            "glob": "{executors,generators}/**/*.json",
             "input": "{projectRoot}/src",
             "output": "."
           },
