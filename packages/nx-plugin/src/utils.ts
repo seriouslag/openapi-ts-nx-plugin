@@ -16,7 +16,10 @@ import { convert } from 'swagger2openapi';
 
 import { CONSTANTS } from './vars';
 
-export type Plugin = string | { asClass: boolean; name: string };
+export type Plugin =
+  | string
+  | { asClass: boolean; name: '@hey-api/sdk' }
+  | { type: 'json' | 'form'; name: '@hey-api/schemas' };
 
 export function generateClientCommand({
   clientType,

@@ -68,6 +68,7 @@ paths:
     spec: tempSpecPath,
     tags: TestOptions.tags,
     tempFolderDir: tempDir + '/temp',
+    preformInstall: false,
   } satisfies OpenApiClientGeneratorSchema;
 
   // Update options with the correct spec file path

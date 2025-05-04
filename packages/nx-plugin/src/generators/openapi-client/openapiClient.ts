@@ -65,13 +65,27 @@ const getClientPlugins = ({
   projectScope,
 }: NormalizedOptions & {
   inputPlugins: Plugin[];
-}): Record<string, ClientPluginOptions> => {
+}) => {
   const plugins: Record<string, ClientPluginOptions> = {
     '@tanstack/react-query': {
       additionalEntryPoints: [`{projectRoot}/src/rq.ts`],
       templateFilesPath: './plugins/rq',
       tsConfigCompilerPaths: {
         [`${projectScope}/${projectName}/rq`]: `./${projectRoot}/src/rq.ts`,
+      },
+    },
+    zod: {
+      additionalEntryPoints: [`{projectRoot}/src/zod.ts`],
+      templateFilesPath: './plugins/zod',
+      tsConfigCompilerPaths: {
+        [`${projectScope}/${projectName}/zod`]: `./${projectRoot}/src/zod.ts`,
+      },
+    },
+    '@hey-api/schemas': {
+      additionalEntryPoints: [`{projectRoot}/src/schemas.ts`],
+      templateFilesPath: './plugins/schemas',
+      tsConfigCompilerPaths: {
+        [`${projectScope}/${projectName}/schemas`]: `./${projectRoot}/src/schemas.ts`,
       },
     },
   };
@@ -84,6 +98,7 @@ const getClientPlugins = ({
         const keyedPlugin = plugin as keyof typeof plugins;
         const foundPlugin = plugins[keyedPlugin];
         if (!foundPlugin) {
+          acc[plugin] = {};
           return acc;
         }
         acc[plugin] = foundPlugin;
@@ -182,6 +197,10 @@ export interface OpenApiClientGeneratorSchema {
    * The test runner to use for the project, defaults to `none`
    */
   test?: TestRunner | 'none';
+  /**
+   * Whether to perform the install of the dependencies, defaults to `true`
+   */
+  preformInstall?: boolean;
 }
 
 export default async function (
@@ -204,6 +223,7 @@ export default async function (
     projectScope,
     specFile,
     tempFolder,
+    preformInstall,
   } = normalizedOptions;
   const absoluteTempFolder = join(process.cwd(), tempFolder);
   logger.info(
@@ -233,6 +253,21 @@ export default async function (
       tree,
     });
 
+    // Update the package.json file
+    logger.info(`Updating package.json with dependencies`);
+    const installDeps = await updatePackageJson({
+      clientType,
+      isPrivate,
+      plugins,
+      projectRoot,
+      tree,
+    });
+
+    // Install the dependencies for the project as we need to do this before generating the api client code in case any plugins are missing
+    if (preformInstall) {
+      await installDeps();
+    }
+
     // Generate the api client code
     logger.info(`Generating API client code using spec file: ${specFile}`);
     const { specFileLocalLocations } = await generateApi({
@@ -241,16 +276,6 @@ export default async function (
       projectRoot,
       specFile,
       tempFolder,
-      tree,
-    });
-
-    // Update the package.json file
-    logger.info(`Updating package.json with dependencies`);
-    await updatePackageJson({
-      clientType,
-      isPrivate,
-      plugins,
-      projectRoot,
       tree,
     });
 
@@ -282,11 +307,13 @@ export default async function (
     );
     // Return a function that installs the packages
     return async () => {
-      logger.info(`Installing dependencies for ${projectName}`);
-      const packageManager = detectPackageManager(workspaceRoot);
+      if (preformInstall) {
+        logger.info(`Installing dependencies for ${projectName}`);
+        const packageManager = detectPackageManager(workspaceRoot);
 
-      installPackagesTask(tree, true, workspaceRoot, packageManager);
-      logger.info(`Dependencies installed successfully`);
+        installPackagesTask(tree, true, workspaceRoot, packageManager);
+        logger.info(`Dependencies installed successfully`);
+      }
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -312,12 +339,14 @@ export interface NormalizedOptions {
   tagArray: string[];
   tempFolder: string;
   test: TestRunner | 'none';
+  preformInstall?: boolean;
 }
 
 export type GeneratedOptions = NormalizedOptions &
   typeof CONSTANTS & {
     pathToTsConfig: string;
     tsConfigName: string;
+    stringifyPlugin: (plugin: Plugin) => string;
   };
 
 type ProjectConfigurationTargets = NonNullable<ProjectConfiguration['targets']>;
@@ -354,6 +383,15 @@ export function normalizeOptions(
   const tempFolder =
     options.tempFolderDir ?? join(defaultTempFolder, projectName);
   const [default1, default2, ...rest] = defaultPlugins;
+  const mappedProvidedPlugins = options.plugins.map((plugin) => {
+    if (plugin === '@hey-api/schemas') {
+      return {
+        type: 'json',
+        name: plugin,
+      } as const;
+    }
+    return plugin;
+  });
   const plugins = [
     default1,
     options.asClass
@@ -363,7 +401,7 @@ export function normalizeOptions(
         }
       : default2,
     ...rest,
-    ...options.plugins,
+    ...mappedProvidedPlugins,
   ];
 
   return {
@@ -380,6 +418,7 @@ export function normalizeOptions(
     tagArray,
     tempFolder,
     test: options.test ?? 'none',
+    preformInstall: options.preformInstall ?? true,
   };
 }
 
@@ -452,7 +491,7 @@ export async function generateNxProject({
 
   for (const plugin of plugins) {
     const clientPlugin = clientPlugins[getPluginName(plugin)];
-    if (clientPlugin) {
+    if (clientPlugin && typeof clientPlugin !== 'boolean') {
       additionalEntryPoints.push(...(clientPlugin.additionalEntryPoints ?? []));
     }
   }
@@ -564,6 +603,26 @@ export async function generateNxProject({
     },
   });
 
+  const stringifyPlugin = (plugin: unknown): string => {
+    if (typeof plugin === 'string') {
+      return `'${plugin}'`;
+    }
+    if (typeof plugin === 'object' && plugin !== null) {
+      const entries = Object.entries(plugin);
+      return `{
+      ${entries
+        .map(([key, value]) => {
+          if (typeof value === 'object') {
+            return `${key}: ${stringifyPlugin(value)}`;
+          }
+          return `${key}: ${typeof value === 'string' ? `'${value}'` : value}`;
+        })
+        .join(',\n      ')}
+    }`;
+    }
+    return String(plugin);
+  };
+
   /**
    * The variables that are passed to the template files
    */
@@ -571,8 +630,9 @@ export async function generateNxProject({
     ...normalizedOptions,
     ...CONSTANTS,
     pathToTsConfig: tsConfigDirectory,
-    plugins: plugins.map(getPluginName),
+    plugins: plugins.map((plugin) => JSON.stringify(plugin)),
     tsConfigName,
+    stringifyPlugin,
   };
 
   // Create directory structure
@@ -580,10 +640,12 @@ export async function generateNxProject({
   generateFiles(tree, templatePath, projectRoot, generatedOptions);
 
   for (const plugin of plugins) {
-    const pluginConfiguration = clientPlugins[getPluginName(plugin)];
+    const name = getPluginName(plugin);
+    const pluginConfiguration = clientPlugins[name];
     if (pluginConfiguration) {
       handlePlugin({
         generatedOptions,
+        name,
         pluginConfiguration,
         projectRoot,
         tree,
@@ -607,15 +669,18 @@ export async function generateNxProject({
 
 function handlePlugin({
   generatedOptions,
+  name,
   pluginConfiguration,
   projectRoot,
   tree,
 }: {
   generatedOptions: GeneratedOptions;
+  name: string;
   pluginConfiguration: ClientPluginOptions;
   projectRoot: string;
   tree: Tree;
 }) {
+  logger.debug(`Handling plugin: ${name}`);
   if (pluginConfiguration.templateFilesPath) {
     const pluginTemplatePath = join(
       __dirname,
@@ -801,6 +866,8 @@ export async function updatePackageJson({
   const clientDetails = getPackageDetails(clientType);
   // add the openapi-ts as a dependency
   const openApiTsDetails = getPackageDetails('@hey-api/openapi-ts');
+
+  const nonPackagePlugins = ['@hey-api/schemas'];
   // add the plugins as dependencies
   const pluginDetails = plugins
     // filter out the default plugins as they are not packages
@@ -810,6 +877,8 @@ export async function updatePackageJson({
           getPluginName(plugin),
         ),
     )
+    // also filter out non-package plugins
+    .filter((plugin) => !nonPackagePlugins.includes(getPluginName(plugin)))
     .map((plugin) => getPackageDetails(getPluginName(plugin)));
 
   const results = await Promise.all([
@@ -832,21 +901,29 @@ export async function updatePackageJson({
     deps['axios'] = `^${axiosVersion}`;
   }
 
-  addDependenciesToPackageJson(
-    tree,
-    deps,
-    {},
-    join(projectRoot, 'package.json'),
+  const tasks: (() => Promise<void> | void)[] = [];
+
+  tasks.push(
+    addDependenciesToPackageJson(
+      tree,
+      deps,
+      {},
+      join(projectRoot, 'package.json'),
+    ),
   );
 
   if (!isWorkspacesEnabled(detectPackageManager(workspaceRoot))) {
     if (tree.exists(join(workspaceRoot, 'package.json'))) {
       // if workspaces are not enabled then we need to install the dependencies to the root
-      addDependenciesToPackageJson(
-        tree,
-        deps,
-        {},
-        join(workspaceRoot, 'package.json'),
+      // we need to remove the previous task as we are adding the dependencies to the root package.json
+      tasks.pop();
+      tasks.push(
+        addDependenciesToPackageJson(
+          tree,
+          deps,
+          {},
+          join(workspaceRoot, 'package.json'),
+        ),
       );
     } else {
       logger.warn(
@@ -866,6 +943,8 @@ export async function updatePackageJson({
     }
     return json;
   });
+
+  return async () => await Promise.all(tasks.map(async (task) => await task()));
 }
 
 export function updateTsConfig({
@@ -893,6 +972,9 @@ export function updateTsConfig({
       for (const plugin of Object.keys(clientPlugins)) {
         const item = clientPlugins[plugin];
         if (!item) {
+          continue;
+        }
+        if (typeof item === 'boolean') {
           continue;
         }
         const pluginTsConfigPath = item.tsConfigCompilerPaths;
