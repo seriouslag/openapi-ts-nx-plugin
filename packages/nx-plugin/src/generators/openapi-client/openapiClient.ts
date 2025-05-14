@@ -201,6 +201,10 @@ export interface OpenApiClientGeneratorSchema {
    * Whether to perform the install of the dependencies, defaults to `true`
    */
   preformInstall?: boolean;
+  /**
+   * The command name to use to serve the implicit dependencies, defaults to `serve`. This is used to watch the implicit dependencies for changes.
+   */
+  serveCmdName?: string;
 }
 
 export default async function (
@@ -340,6 +344,7 @@ export interface NormalizedOptions {
   tempFolder: string;
   test: TestRunner | 'none';
   preformInstall?: boolean;
+  serveCmdName: string;
 }
 
 export type GeneratedOptions = NormalizedOptions &
@@ -394,6 +399,7 @@ export function normalizeOptions(
   });
   const plugins = [
     default1,
+    // TODO: asClass is not working
     options.asClass
       ? {
           asClass: true,
@@ -419,6 +425,7 @@ export function normalizeOptions(
     tempFolder,
     test: options.test ?? 'none',
     preformInstall: options.preformInstall ?? true,
+    serveCmdName: options.serveCmdName ?? 'serve',
   };
 }
 
@@ -426,14 +433,17 @@ export function normalizeOptions(
  * Builds the spec path
  */
 export function buildSpecPath(specPath: string) {
+  // if the spec path is a url then we can just return it
   const isSpecFileUrl = isUrl(specPath);
   if (isSpecFileUrl) {
     return specPath;
   }
+  // if the spec path is an absolute path then we can just return it
   const isSpecFileAbsolutePath = isAbsolute(specPath);
   if (isSpecFileAbsolutePath) {
     return specPath;
   }
+  // if the spec path is a relative path then we convert it one in the workspace
   const newSpecPath = specPath.replace('./', `{workspaceRoot}/`);
   return newSpecPath;
 }
@@ -482,6 +492,7 @@ export async function generateNxProject({
     specFile,
     tagArray,
     test,
+    serveCmdName,
   } = normalizedOptions;
 
   const specIsAFile = isAFile(specFile);
@@ -543,6 +554,24 @@ export async function generateNxProject({
     projectRoot,
   });
 
+  // TODO: we should check if the serveCmdName is a valid command in the `dependsOnProject`; user feedback could be better
+  const serve = dependsOnProject
+    ? {
+        cache: false,
+        dependsOn: [`^${serveCmdName}`],
+        executor: `${packageJson.name}:update-api`,
+        inputs: updateInputs,
+        options: {
+          ...buildUpdateOptions(normalizedOptions),
+          watch: true,
+        },
+        outputs: [
+          `{projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
+          `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
+        ],
+      }
+    : undefined;
+
   // Create basic project structure
   addProjectConfiguration(tree, `${projectScope}/${projectName}`, {
     implicitDependencies: dependsOnProject ? [dependsOnProject] : [],
@@ -593,6 +622,7 @@ export async function generateNxProject({
         cache: true,
         dependsOn: ['^build'],
         executor: `${packageJson.name}:update-api`,
+        continuous: true,
         inputs: updateInputs,
         options: buildUpdateOptions(normalizedOptions),
         outputs: [
@@ -600,6 +630,7 @@ export async function generateNxProject({
           `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
         ],
       },
+      ...(serve ? { serve } : {}),
     },
   });
 
@@ -1014,17 +1045,30 @@ export async function getProjectThatSpecIsIn(tree: Tree, specFile: string) {
         logger.debug('Provided spec file is in project: ', projectJsonName);
         return projectJsonName;
       }
-      const packageJsonPath = join(project.root, 'package.json');
-      const packageJson = readJson(tree, packageJsonPath);
-      const projectName = packageJson.name;
-      if (!projectName) {
-        throw new Error('No name found in package.json.');
-      } else if (typeof projectName === 'string') {
-        logger.debug('Provided spec file is in project: ', projectName);
-        return projectName;
-      }
-      throw new Error('Project name is not a valid string.');
+
+      const projectName = getProjectName(tree, project);
+      return projectName;
     }
   }
   return null;
 }
+
+export const getProjectName = (tree: Tree, project: ProjectConfiguration) => {
+  const packageJsonPath = join(project.root, 'package.json');
+  const projectJsonPath = join(project.root, 'project.json');
+  if (tree.exists(packageJsonPath)) {
+    const packageJson = readJson(tree, packageJsonPath);
+    const projectName = packageJson.name;
+    if (typeof projectName === 'string') {
+      return projectName;
+    }
+  }
+  if (tree.exists(projectJsonPath)) {
+    const projectJson = readJson(tree, projectJsonPath);
+    const projectName = projectJson.name;
+    if (typeof projectName === 'string') {
+      return projectName;
+    }
+  }
+  throw new Error('No name found in package.json.');
+};

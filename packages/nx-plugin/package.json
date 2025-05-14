@@ -1,6 +1,6 @@
 {
   "name": "@seriouslag/nx-openapi-ts-plugin",
-  "version": "0.0.32",
+  "version": "0.0.33",
   "description": "🚀 Nx plugin for `@hey-api/openapi-ts` codegen.",
   "repository": {
     "type": "git",
@@ -33,9 +33,9 @@
   "generators": "./generators.json",
   "executors": "./executors.json",
   "dependencies": {
-    "@hey-api/json-schema-ref-parser": "^1.0.5",
-    "@hey-api/openapi-ts": "^0.67.1",
-    "@nx/devkit": "^20.8.1",
+    "@hey-api/json-schema-ref-parser": "^1.0.6",
+    "@hey-api/openapi-ts": "^0.67.3",
+    "@nx/devkit": "^21.0.3",
     "api-smart-diff": "^1.0.6",
     "latest-version": "^9.0.0",
     "prettier": "^3.5.3",
@@ -46,8 +46,8 @@
   "devDependencies": {
     "@types/swagger2openapi": "^7.0.4",
     "typescript": "^5.8.3",
-    "vite": "^6.3.4",
-    "vitest": "^3.1.2"
+    "vite": "^6.3.5",
+    "vitest": "^3.1.3"
   },
   "files": [
     "generators.json",
