@@ -3,7 +3,11 @@ import { rm } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
 import { defaultPlugins } from '@hey-api/openapi-ts';
-import type { ProjectConfiguration, Tree } from '@nx/devkit';
+import type {
+  ProjectConfiguration,
+  TargetConfiguration,
+  Tree,
+} from '@nx/devkit';
 import {
   addDependenciesToPackageJson,
   addProjectConfiguration,
@@ -556,10 +560,11 @@ export async function generateNxProject({
 
   // TODO: we should check if the serveCmdName is a valid command in the `dependsOnProject`; user feedback could be better
   const serve = dependsOnProject
-    ? {
+    ? ({
         cache: false,
-        dependsOn: [`^${serveCmdName}`],
+        dependsOn: [{ projects: [dependsOnProject], target: serveCmdName }],
         executor: `${packageJson.name}:update-api`,
+        continuous: true,
         inputs: updateInputs,
         options: {
           ...buildUpdateOptions(normalizedOptions),
@@ -569,7 +574,7 @@ export async function generateNxProject({
           `{projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
           `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
         ],
-      }
+      } satisfies TargetConfiguration)
     : undefined;
 
   // Create basic project structure
