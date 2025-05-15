@@ -86,11 +86,11 @@ describe('openapi-client generator', () => {
         projectName: 'test-api',
         projectRoot: `${tempDirectory}/test-api-${uuid}/test-api`,
         projectScope: '@test-api',
+        serveCmdName: 'serve',
         specFile: specPath,
         tagArray: ['api', 'openapi'],
         tempFolder: options.tempFolderDir,
         test: 'none',
-        serveCmdName: 'serve',
       });
     });
 
@@ -119,11 +119,11 @@ describe('openapi-client generator', () => {
         projectName: 'test-api',
         projectRoot: 'custom-dir/test-api',
         projectScope: '@test-api',
+        serveCmdName: 'serve',
         specFile: specPath,
         tagArray: ['custom', 'tags'],
         tempFolder: options.tempFolderDir,
         test: 'none',
-        serveCmdName: 'serve',
       });
     });
   });

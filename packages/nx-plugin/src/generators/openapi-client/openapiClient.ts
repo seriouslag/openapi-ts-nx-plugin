@@ -71,6 +71,13 @@ const getClientPlugins = ({
   inputPlugins: Plugin[];
 }) => {
   const plugins: Record<string, ClientPluginOptions> = {
+    '@hey-api/schemas': {
+      additionalEntryPoints: [`{projectRoot}/src/schemas.ts`],
+      templateFilesPath: './plugins/schemas',
+      tsConfigCompilerPaths: {
+        [`${projectScope}/${projectName}/schemas`]: `./${projectRoot}/src/schemas.ts`,
+      },
+    },
     '@tanstack/react-query': {
       additionalEntryPoints: [`{projectRoot}/src/rq.ts`],
       templateFilesPath: './plugins/rq',
@@ -83,13 +90,6 @@ const getClientPlugins = ({
       templateFilesPath: './plugins/zod',
       tsConfigCompilerPaths: {
         [`${projectScope}/${projectName}/zod`]: `./${projectRoot}/src/zod.ts`,
-      },
-    },
-    '@hey-api/schemas': {
-      additionalEntryPoints: [`{projectRoot}/src/schemas.ts`],
-      templateFilesPath: './plugins/schemas',
-      tsConfigCompilerPaths: {
-        [`${projectScope}/${projectName}/schemas`]: `./${projectRoot}/src/schemas.ts`,
       },
     },
   };
@@ -177,6 +177,10 @@ export interface OpenApiClientGeneratorSchema {
    */
   plugins: string[];
   /**
+   * Whether to perform the install of the dependencies, defaults to `true`
+   */
+  preformInstall?: boolean;
+  /**
    * Whether to make the generated package private, defaults to `true`
    */
   private?: boolean;
@@ -184,6 +188,10 @@ export interface OpenApiClientGeneratorSchema {
    * The scope of the project
    */
   scope: string;
+  /**
+   * The command name to use to serve the implicit dependencies, defaults to `serve`. This is used to watch the implicit dependencies for changes.
+   */
+  serveCmdName?: string;
   /**
    * The spec file to use for the OpenAPI client
    */
@@ -201,14 +209,6 @@ export interface OpenApiClientGeneratorSchema {
    * The test runner to use for the project, defaults to `none`
    */
   test?: TestRunner | 'none';
-  /**
-   * Whether to perform the install of the dependencies, defaults to `true`
-   */
-  preformInstall?: boolean;
-  /**
-   * The command name to use to serve the implicit dependencies, defaults to `serve`. This is used to watch the implicit dependencies for changes.
-   */
-  serveCmdName?: string;
 }
 
 export default async function (
@@ -226,12 +226,12 @@ export default async function (
     clientType,
     isPrivate,
     plugins,
+    preformInstall,
     projectName,
     projectRoot,
     projectScope,
     specFile,
     tempFolder,
-    preformInstall,
   } = normalizedOptions;
   const absoluteTempFolder = join(process.cwd(), tempFolder);
   logger.info(
@@ -339,23 +339,23 @@ export interface NormalizedOptions {
   clientType: string;
   isPrivate: boolean;
   plugins: Plugin[];
+  preformInstall?: boolean;
   projectDirectory: string;
   projectName: string;
   projectRoot: string;
   projectScope: string;
+  serveCmdName: string;
   specFile: string;
   tagArray: string[];
   tempFolder: string;
   test: TestRunner | 'none';
-  preformInstall?: boolean;
-  serveCmdName: string;
 }
 
 export type GeneratedOptions = NormalizedOptions &
   typeof CONSTANTS & {
     pathToTsConfig: string;
-    tsConfigName: string;
     stringifyPlugin: (plugin: Plugin) => string;
+    tsConfigName: string;
   };
 
 type ProjectConfigurationTargets = NonNullable<ProjectConfiguration['targets']>;
@@ -395,8 +395,8 @@ export function normalizeOptions(
   const mappedProvidedPlugins = options.plugins.map((plugin) => {
     if (plugin === '@hey-api/schemas') {
       return {
-        type: 'json',
         name: plugin,
+        type: 'json',
       } as const;
     }
     return plugin;
@@ -420,16 +420,16 @@ export function normalizeOptions(
     clientType: options.client,
     isPrivate: options.private ?? true,
     plugins,
+    preformInstall: options.preformInstall ?? true,
     projectDirectory,
     projectName,
     projectRoot,
     projectScope: options.scope,
+    serveCmdName: options.serveCmdName ?? 'serve',
     specFile: options.spec,
     tagArray,
     tempFolder,
     test: options.test ?? 'none',
-    preformInstall: options.preformInstall ?? true,
-    serveCmdName: options.serveCmdName ?? 'serve',
   };
 }
 
@@ -493,10 +493,10 @@ export async function generateNxProject({
     projectName,
     projectRoot,
     projectScope,
+    serveCmdName,
     specFile,
     tagArray,
     test,
-    serveCmdName,
   } = normalizedOptions;
 
   const specIsAFile = isAFile(specFile);
@@ -562,9 +562,9 @@ export async function generateNxProject({
   const serve = dependsOnProject
     ? ({
         cache: false,
+        continuous: true,
         dependsOn: [{ projects: [dependsOnProject], target: serveCmdName }],
         executor: `${packageJson.name}:update-api`,
-        continuous: true,
         inputs: updateInputs,
         options: {
           ...buildUpdateOptions(normalizedOptions),
@@ -627,7 +627,6 @@ export async function generateNxProject({
         cache: true,
         dependsOn: ['^build'],
         executor: `${packageJson.name}:update-api`,
-        continuous: true,
         inputs: updateInputs,
         options: buildUpdateOptions(normalizedOptions),
         outputs: [
@@ -667,8 +666,8 @@ export async function generateNxProject({
     ...CONSTANTS,
     pathToTsConfig: tsConfigDirectory,
     plugins: plugins.map((plugin) => JSON.stringify(plugin)),
-    tsConfigName,
     stringifyPlugin,
+    tsConfigName,
   };
 
   // Create directory structure
