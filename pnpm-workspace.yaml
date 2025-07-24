@@ -7,3 +7,4 @@ onlyBuiltDependencies:
   - '@tailwindcss/oxide'
   - esbuild
   - nx
+  - unrs-resolver

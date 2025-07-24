@@ -19,7 +19,7 @@ pnpm install
 
 ```bash
 # run the generator to generate a package
-npx nx run @seriouslag/nx-openapi-ts-plugin:build && nx g @seriouslag/nx-openapi-ts-plugin:openapi-client pokemon-api --directory ./packages --scope @test-api --client @hey-api/client-fetch --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml --plugins @tanstack/react-query  --private false --verbose
+npx nx run @seriouslag/nx-openapi-ts-plugin:build && nx g @seriouslag/nx-openapi-ts-plugin:openapi-client pokemon-api --directory ./packages --scope @test-api --client @hey-api/client-fetch --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml --plugins @tanstack/react-query --private false --verbose
 
 # Install will happen automatically after new package is generated
 
