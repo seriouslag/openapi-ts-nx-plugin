@@ -39,6 +39,7 @@ import {
   isAFile,
   isUrl,
   makeDir,
+  getRelativePath,
 } from '../../utils';
 import { CONSTANTS } from '../../vars';
 
@@ -354,6 +355,7 @@ export interface NormalizedOptions {
 export type GeneratedOptions = NormalizedOptions &
   typeof CONSTANTS & {
     pathToTsConfig: string;
+    relativePathToWorkspaceRoot: string;
     stringifyPlugin: (plugin: Plugin) => string;
     tsConfigName: string;
   };
@@ -659,6 +661,11 @@ export async function generateNxProject({
     return String(plugin);
   };
 
+  const relativePathToWorkspaceRoot = getRelativePath(
+    projectRoot,
+    workspaceRoot,
+  );
+
   /**
    * The variables that are passed to the template files
    */
@@ -666,6 +673,7 @@ export async function generateNxProject({
     ...normalizedOptions,
     ...CONSTANTS,
     pathToTsConfig: tsConfigDirectory,
+    relativePathToWorkspaceRoot,
     plugins: plugins.map((plugin) => JSON.stringify(plugin)),
     stringifyPlugin,
     tsConfigName,
