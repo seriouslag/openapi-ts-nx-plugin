@@ -29,6 +29,11 @@
             "output": "."
           },
           {
+            "glob": "options",
+            "input": "{projectRoot}/src/generators/openapi-client",
+            "output": "."
+          },
+          {
             "glob": "plugins",
             "input": "{projectRoot}/src/generators/openapi-client",
             "output": "."

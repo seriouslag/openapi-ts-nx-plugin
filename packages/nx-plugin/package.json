@@ -1,6 +1,6 @@
 {
   "name": "@seriouslag/nx-openapi-ts-plugin",
-  "version": "0.0.40",
+  "version": "0.0.41",
   "description": "🚀 Nx plugin for `@hey-api/openapi-ts` codegen.",
   "repository": {
     "type": "git",
@@ -35,7 +35,7 @@
   "dependencies": {
     "@hey-api/json-schema-ref-parser": "^1.0.6",
     "@hey-api/openapi-ts": "https://pkg.pr.new/hey-api/openapi-ts/@hey-api/openapi-ts@2356",
-    "@nx/devkit": "^21.3.5",
+    "@nx/devkit": "^21.3.10",
     "api-smart-diff": "^1.0.6",
     "latest-version": "^9.0.0",
     "prettier": "^3.6.2",

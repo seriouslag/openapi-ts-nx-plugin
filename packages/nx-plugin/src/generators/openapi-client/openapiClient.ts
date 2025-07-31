@@ -35,11 +35,11 @@ import {
   getBaseTsConfigPath,
   getPackageName,
   getPluginName,
+  getRelativePath,
   getVersionOfPackage,
   isAFile,
   isUrl,
   makeDir,
-  getRelativePath,
 } from '../../utils';
 import { CONSTANTS } from '../../vars';
 
@@ -185,6 +185,10 @@ export interface OpenApiClientGeneratorSchema {
    * Whether to make the generated package private, defaults to `true`
    */
   private?: boolean;
+  /**
+   * Whether to not add project references to the generated project, defaults to `true`
+   */
+  projectReferences?: boolean;
   /**
    * The scope of the project
    */
@@ -343,6 +347,7 @@ export interface NormalizedOptions {
   preformInstall?: boolean;
   projectDirectory: string;
   projectName: string;
+  projectReferences: boolean;
   projectRoot: string;
   projectScope: string;
   serveCmdName: string;
@@ -425,6 +430,7 @@ export function normalizeOptions(
     preformInstall: options.preformInstall ?? true,
     projectDirectory,
     projectName,
+    projectReferences: options.projectReferences ?? true,
     projectRoot,
     projectScope: options.scope,
     serveCmdName: options.serveCmdName ?? 'serve',
@@ -493,6 +499,7 @@ export async function generateNxProject({
     clientType,
     plugins,
     projectName,
+    projectReferences,
     projectRoot,
     projectScope,
     serveCmdName,
@@ -516,14 +523,20 @@ export async function generateNxProject({
   const baseInputs: Input[] = [
     `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
     '{projectRoot}/package.json',
-    '{projectRoot}/tsconfig.json',
-    '{projectRoot}/tsconfig.lib.json',
+    `{projectRoot}/${CONSTANTS.TS_CONFIG_NAME}`,
+    ...(projectReferences
+      ? [`{projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`]
+      : []),
     '{projectRoot}/openapi-ts.config.ts',
   ];
 
   const dependentTasksOutputFiles = '**/*.{ts,json,yml,yaml}';
 
   const updateInputs: Input[] = [{ dependentTasksOutputFiles }, ...baseInputs];
+
+  const projectTsConfigName = projectReferences
+    ? CONSTANTS.TS_LIB_CONFIG_NAME
+    : CONSTANTS.TS_CONFIG_NAME;
 
   if (specIsAFile) {
     // if the spec file is a file then we need to add it to inputs so that it is watched by NX
@@ -607,7 +620,7 @@ export async function generateNxProject({
           main: `{projectRoot}/src/index.ts`,
           outputPath: `{projectRoot}/dist`,
           rootDir: `{projectRoot}/src`,
-          tsConfig: `{projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`,
+          tsConfig: `{projectRoot}/${projectTsConfigName}`,
         },
         outputs: ['{projectRoot}/dist'],
       },
@@ -673,8 +686,8 @@ export async function generateNxProject({
     ...normalizedOptions,
     ...CONSTANTS,
     pathToTsConfig: tsConfigDirectory,
-    relativePathToWorkspaceRoot,
     plugins: plugins.map((plugin) => JSON.stringify(plugin)),
+    relativePathToWorkspaceRoot,
     stringifyPlugin,
     tsConfigName,
   };
@@ -682,6 +695,24 @@ export async function generateNxProject({
   // Create directory structure
   const templatePath = join(__dirname, 'files');
   generateFiles(tree, templatePath, projectRoot, generatedOptions);
+
+  // if project references are enabled then we need to add the tsconfig.lib.json
+  if (projectReferences) {
+    generateFiles(
+      tree,
+      join(__dirname, 'options', 'projectReferences'),
+      projectRoot,
+      generatedOptions,
+    );
+    // add the tsconfig.lib.json to the tsconfig.json
+    updateJson(tree, `${projectRoot}/${CONSTANTS.TS_CONFIG_NAME}`, (json) => {
+      json.references = [
+        ...(json.references ?? []),
+        { path: `./${CONSTANTS.TS_LIB_CONFIG_NAME}` },
+      ];
+      return json;
+    });
+  }
 
   for (const plugin of plugins) {
     const name = getPluginName(plugin);
@@ -745,16 +776,19 @@ export async function generateTestFiles({
   test: TestRunner;
   tree: Tree;
 }) {
-  // link the tsconfig.spec.json to the tsconfig.json
-  updateJson(tree, `${projectRoot}/tsconfig.json`, (json) => {
-    json.references = [
-      ...(json.references ?? []),
-      {
-        path: `./${CONSTANTS.TS_SPEC_CONFIG_NAME}`,
-      },
-    ];
-    return json;
-  });
+  const { projectReferences } = generatedOptions;
+  // link the tsconfig.spec.json to the tsconfig.json if project references are enabled
+  if (projectReferences) {
+    updateJson(tree, `${projectRoot}/${CONSTANTS.TS_CONFIG_NAME}`, (json) => {
+      json.references = [
+        ...(json.references ?? []),
+        {
+          path: `./${CONSTANTS.TS_SPEC_CONFIG_NAME}`,
+        },
+      ];
+      return json;
+    });
+  }
 
   const { templatePath } = testRunners[test];
   generateFiles(
