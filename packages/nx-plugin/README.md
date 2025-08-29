@@ -5,7 +5,7 @@ This plugin provides a generator and executor for generating and updating OpenAP
 ## Installation
 
 ```bash
-npm install -D @seriouslag/plugin-nx
+npm install -D @seriouslag/nx-openapi-ts-plugin
 ```
 
 ## Usage
