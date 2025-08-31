@@ -2,7 +2,7 @@
 
 [![NPM Version](https://img.shields.io/npm/v/%40seriouslag%2Fnx-openapi-ts-plugin?link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40seriouslag%2Fnx-openapi-ts-plugin)](https://www.npmjs.com/package/@seriouslag/nx-openapi-ts-plugin)
 
-This repo to to develop and test the [@seriouslag/nx-openapi-ts-plugin](https://www.npmjs.com/package/@seriouslag/nx-openapi-ts-plugin)
+This repo is to develop and test the [@seriouslag/nx-openapi-ts-plugin](https://www.npmjs.com/package/@seriouslag/nx-openapi-ts-plugin)
 
 The package is a NX plugin that assits with the automation of generating NX projects to a workspace based off an OpenAPI spec file.
 Under the hood it uses [@hey-api/openapi-ts](https://github.com/hey-api/openapi-ts) to generate client code from the OpenAPI spec file.
