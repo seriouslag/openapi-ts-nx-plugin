@@ -124,23 +124,34 @@ export async function bundleAndDereferenceSpecFile({
     logger.debug(`Bundling OpenAPI spec file ${specPath}...`);
 
     logger.debug(`Getting spec file...`);
-    const { data, error } = await getSpec({
+    const specResult = await getSpec({
       inputPath: specPath,
       timeout: 10000,
       watch: { headers: new Headers() },
     });
-    if (error) {
-      logger.error(`Failed to get spec file: ${error}`);
-      throw new Error(`Failed to get spec file: ${error}`);
+    if ('error' in specResult && specResult.error) {
+      logger.error(`Failed to get spec file: ${specResult.error}`);
+      throw new Error(`Failed to get spec file: ${specResult.error}`);
     }
     logger.debug(`Spec file loaded.`);
-    const spec = data;
+    // The resolvedInput contains the parsed spec
+    const spec = specResult.resolvedInput;
     // loading default config
     logger.debug(`Loading default config...`);
     const configs = await initConfigs({
-      input: specPath,
-      output: outputPath,
-      plugins: [client, ...plugins] as ClientConfig['plugins'],
+      logger: {
+        debug: (message: string) => logger.debug(message),
+        error: (message: string) => logger.error(message),
+        info: (message: string) => logger.info(message),
+        warn: (message: string) => logger.warn(message),
+      },
+      userConfigs: [
+        {
+          input: specPath,
+          output: outputPath,
+          plugins: [client, ...plugins] as ClientConfig['plugins'],
+        },
+      ],
     });
     // getting the first config
     const dependencies = configs.dependencies;
@@ -166,6 +177,12 @@ export async function bundleAndDereferenceSpecFile({
     const context = parseOpenApiSpec({
       config,
       dependencies,
+      logger: {
+        debug: (message: string) => logger.debug(message),
+        error: (message: string) => logger.error(message),
+        info: (message: string) => logger.info(message),
+        warn: (message: string) => logger.warn(message),
+      },
       spec,
     });
     if (!context) {
@@ -194,11 +211,12 @@ async function getSpecFile(path: string) {
     timeout: 10000,
     watch: { headers: new Headers() },
   });
-  if (spec.error) {
+  if ('error' in spec && spec.error) {
     throw new Error('Failed to read spec file');
   }
 
-  return spec.data;
+  // The resolvedInput contains the parsed spec data
+  return spec.resolvedInput as JSONSchema;
 }
 
 /**
