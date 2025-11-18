@@ -133,69 +133,16 @@ export async function bundleAndDereferenceSpecFile({
       logger.error(`Failed to get spec file: ${specResult.error}`);
       throw new Error(`Failed to get spec file: ${specResult.error}`);
     }
-    logger.debug(`Spec file loaded.`);
-    // The resolvedInput contains the parsed spec
-    const spec = specResult.resolvedInput;
-    // loading default config
-    logger.debug(`Loading default config...`);
-    const configs = await initConfigs({
-      logger: {
-        debug: (message: string) => logger.debug(message),
-        error: (message: string) => logger.error(message),
-        info: (message: string) => logger.info(message),
-        warn: (message: string) => logger.warn(message),
-      },
-      userConfigs: [
-        {
-          input: specPath,
-          output: outputPath,
-          plugins: [client, ...plugins] as ClientConfig['plugins'],
-        },
-      ],
-    });
-    // getting the first config
-    const dependencies = configs.dependencies;
-    const firstResult = configs.results[0];
-    if (!firstResult) {
-      logger.error('Failed to load config.');
-      throw new Error('Failed to load config.');
-    }
-    // check if the config is valid
-    const { config, errors } = firstResult;
-    const firstError = errors[0];
-    if (firstError && !config) {
-      logger.error(`Failed to load config: ${firstError.message}`);
-      throw new Error(`Failed to load config: ${firstError.message}`, {
-        cause: firstError,
-      });
-    }
-    if (!config) {
-      logger.error('Failed to load config.');
-      throw new Error('Failed to load config.');
-    }
-    logger.debug(`Parsing spec...`);
-    const context = parseOpenApiSpec({
-      config,
-      dependencies,
-      logger: {
-        debug: (message: string) => logger.debug(message),
-        error: (message: string) => logger.error(message),
-        info: (message: string) => logger.info(message),
-        warn: (message: string) => logger.warn(message),
-      },
-      spec,
-    });
-    if (!context) {
-      logger.error('Failed to parse spec.');
-      throw new Error('Failed to parse spec.');
-    }
-    const dereferencedSpec = context?.spec;
+    logger.debug(`Spec file loaded and resolved.`);
+    // The resolvedInput from getSpec is already the dereferenced spec
+    // In the new version, getSpec handles parsing and dereferencing
+    const dereferencedSpec = specResult.resolvedInput as JSONSchema;
     if (!dereferencedSpec) {
-      logger.error('Failed to dereference spec.');
-      throw new Error('Failed to dereference spec.');
+      logger.error('Failed to get dereferenced spec.');
+      throw new Error('Failed to get dereferenced spec.');
     }
     logger.debug(`Spec bundled and dereferenced.`);
-    return dereferencedSpec as JSONSchema;
+    return dereferencedSpec;
   } catch (error) {
     logger.error(`Failed to bundle and dereference spec file: ${error}.`);
     throw error;
@@ -216,7 +163,19 @@ async function getSpecFile(path: string) {
   }
 
   // The resolvedInput contains the parsed spec data
-  return spec.resolvedInput as JSONSchema;
+  const resolved = spec.resolvedInput as any;
+  if (!resolved) {
+    throw new Error(`resolvedInput is undefined for path: ${path}`);
+  }
+  // Check if resolvedInput has a schema property with a valid value
+  if (typeof resolved === 'object' && 'schema' in resolved && resolved.schema) {
+    return resolved.schema as JSONSchema;
+  }
+  // resolvedInput itself should be the spec
+  if (typeof resolved !== 'object' || resolved === null) {
+    throw new Error(`resolvedInput is not an object for path: ${path}, type: ${typeof resolved}`);
+  }
+  return resolved as JSONSchema;
 }
 
 /**
@@ -259,6 +218,9 @@ export async function getSpecFiles(
 }
 
 export function getSpecFileVersion(spec: JSONSchema) {
+  if (!spec || typeof spec !== 'object') {
+    throw new Error(`Invalid spec: expected object, got ${typeof spec}`);
+  }
   if ('openapi' in spec) {
     if (typeof spec.openapi === 'string') {
       return spec.openapi;
@@ -271,7 +233,9 @@ export function getSpecFileVersion(spec: JSONSchema) {
     }
     throw new Error('Spec file swagger version is not a string');
   }
-  throw new Error('Spec file does not contain an openapi or swagger version');
+  // If neither openapi nor swagger field exists, assume it's been converted to OpenAPI 3.0
+  // by the parser (which automatically converts Swagger 2.0 to OpenAPI 3.0)
+  return '3.0.0';
 }
 
 export async function convertSwaggerToOpenApi(spec: JSONSchema) {

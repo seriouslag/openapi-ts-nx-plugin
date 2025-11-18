@@ -707,7 +707,7 @@ paths:
       );
     });
 
-    it('should throw error when neither OpenAPI nor Swagger version is present', () => {
+    it('should return default OpenAPI 3.0.0 when neither OpenAPI nor Swagger version is present', () => {
       const spec = {
         info: {
           title: 'Test API',
@@ -715,9 +715,8 @@ paths:
         },
       };
 
-      expect(() => getSpecFileVersion(spec)).toThrow(
-        'Spec file does not contain an openapi or swagger version',
-      );
+      const version = getSpecFileVersion(spec);
+      expect(version).toBe('3.0.0');
     });
   });
 

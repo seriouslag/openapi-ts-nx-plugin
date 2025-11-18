@@ -45,3 +45,7 @@ vite.config.*.timestamp*
 vitest.config.*.timestamp*
 
 *.log
+
+# Temporary test files
+temp-spec-*.yaml
+test-*.mjs
