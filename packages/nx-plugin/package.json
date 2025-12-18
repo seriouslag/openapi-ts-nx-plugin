@@ -34,7 +34,7 @@
   "executors": "./executors.json",
   "dependencies": {
     "@hey-api/json-schema-ref-parser": "^1.0.6",
-    "@hey-api/openapi-ts": "^0.87.5",
+    "@hey-api/openapi-ts": "^0.89.0",
     "@nx/devkit": "^21.3.10",
     "api-smart-diff": "^1.0.6",
     "latest-version": "^9.0.0",
