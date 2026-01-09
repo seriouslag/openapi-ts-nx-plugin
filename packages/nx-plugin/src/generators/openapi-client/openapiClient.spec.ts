@@ -122,6 +122,7 @@ describe('openapi-client generator', () => {
         tagArray: ['api', 'openapi'],
         tempFolder: options.tempFolderDir,
         test: 'none',
+        useInferredTasks: false,
       });
     });
 
@@ -156,6 +157,7 @@ describe('openapi-client generator', () => {
         tagArray: ['custom', 'tags'],
         tempFolder: options.tempFolderDir,
         test: 'none',
+        useInferredTasks: false,
       });
     });
   });
