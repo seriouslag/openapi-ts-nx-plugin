@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "OpenAPI Plugin Options",
+  "description": "Options for the @seriouslag/nx-openapi-ts-plugin inferred tasks plugin",
+  "type": "object",
+  "properties": {
+    "generateApiTargetName": {
+      "type": "string",
+      "description": "The name of the generateApi target",
+      "default": "generateApi"
+    },
+    "updateApiTargetName": {
+      "type": "string",
+      "description": "The name of the updateApi target",
+      "default": "updateApi"
+    },
+    "buildTargetName": {
+      "type": "string",
+      "description": "The name of the build target",
+      "default": "build"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Tags to add to the inferred projects"
+    }
+  },
+  "additionalProperties": false
+}

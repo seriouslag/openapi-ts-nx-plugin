@@ -63,3 +63,60 @@ If the spec file is a relative path and is located in the workspace then the con
 The assumption is made that that project will generate the API spec file on build.
 
 If the spec file is a URL then we fetch the spec during cache checks to determine if we should rebuild the client code.
+
+## Inferred Tasks (NX Plugin)
+
+This plugin supports NX inferred tasks, which automatically detect `openapi-ts.config.*` files and create targets without explicit configuration in `project.json`.
+
+### Enabling Inferred Tasks
+
+Add the plugin to your `nx.json`:
+
+```json
+{
+  "plugins": [
+    "@seriouslag/nx-openapi-ts-plugin/plugin"
+  ]
+}
+```
+
+Or with custom options:
+
+```json
+{
+  "plugins": [
+    {
+      "plugin": "@seriouslag/nx-openapi-ts-plugin/plugin",
+      "options": {
+        "generateApiTargetName": "generateApi",
+        "updateApiTargetName": "updateApi",
+        "tags": ["api", "openapi"]
+      }
+    }
+  ]
+}
+```
+
+### Plugin Options
+
+- `generateApiTargetName`: Name of the inferred generateApi target (default: `generateApi`)
+- `updateApiTargetName`: Name of the inferred updateApi target (default: `updateApi`)
+- `buildTargetName`: Name of the build target (default: `build`)
+- `tags`: Tags to add to inferred projects
+
+### Using with Generator
+
+When using the generator, you can enable inferred tasks with the `useInferredTasks` option:
+
+```bash
+nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --scope=@my-app --spec=./spec.yaml --useInferredTasks=true
+```
+
+This will create a minimal project configuration without explicit targets, relying on the plugin to infer them from the `openapi-ts.config.ts` file.
+
+### Inferred Targets
+
+When the plugin detects an `openapi-ts.config.{ts,js,mjs,cjs}` file, it creates the following targets:
+
+- **generateApi**: Runs `npx @hey-api/openapi-ts` using the config file
+- **updateApi**: Uses the `update-api` executor to fetch and compare specs, regenerating if changed

@@ -12,14 +12,15 @@
         "main": "{projectRoot}/src/index.ts",
         "additionalEntryPoints": [
           "{projectRoot}/src/generators/openapi-client/openapiClient.ts",
-          "{projectRoot}/src/executors/update-api/updateApi.ts"
+          "{projectRoot}/src/executors/update-api/updateApi.ts",
+          "{projectRoot}/src/plugin/plugin.ts"
         ],
         "format": ["cjs"],
         "tsConfig": "{projectRoot}/tsconfig.lib.json",
         "rootDir": "{projectRoot}/src",
         "assets": [
           {
-            "glob": "{executors,generators}/**/*.json",
+            "glob": "{executors,generators,plugin}/**/*.json",
             "input": "{projectRoot}/src",
             "output": "."
           },

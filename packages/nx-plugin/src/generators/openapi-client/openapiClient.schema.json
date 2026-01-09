@@ -83,6 +83,11 @@
       "type": "boolean",
       "description": "Whether to not add project references to the generated project, defaults to `true`",
       "default": true
+    },
+    "useInferredTasks": {
+      "type": "boolean",
+      "description": "Whether to use NX inferred tasks instead of explicit targets. When true, the generator will only create minimal project configuration and rely on the plugin to infer targets from openapi-ts.config.ts",
+      "default": false
     }
   },
   "required": ["name", "spec", "scope"]

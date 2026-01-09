@@ -28,10 +28,17 @@
         "default": "./dist/index.cjs.js"
       }
     },
+    "./plugin": {
+      "require": {
+        "types": "./dist/plugin.cjs.d.ts",
+        "default": "./dist/plugin.cjs.js"
+      }
+    },
     "./package.json": "./package.json"
   },
   "generators": "./generators.json",
   "executors": "./executors.json",
+  "plugin": "./dist/plugin.cjs.js",
   "dependencies": {
     "@hey-api/json-schema-ref-parser": "^1.0.6",
     "@hey-api/openapi-ts": "https://pkg.pr.new/hey-api/openapi-ts/@hey-api/openapi-ts@2356",
