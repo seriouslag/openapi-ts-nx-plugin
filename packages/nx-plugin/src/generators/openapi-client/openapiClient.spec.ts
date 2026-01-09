@@ -122,6 +122,7 @@ describe('openapi-client generator', () => {
         tagArray: ['api', 'openapi'],
         tempFolder: options.tempFolderDir,
         test: 'none',
+        useInferredTasks: true,
       });
     });
 
@@ -156,6 +157,7 @@ describe('openapi-client generator', () => {
         tagArray: ['custom', 'tags'],
         tempFolder: options.tempFolderDir,
         test: 'none',
+        useInferredTasks: true,
       });
     });
   });
@@ -166,7 +168,10 @@ describe('openapi-client generator', () => {
         name: `test-api-${randomUUID()}`,
         tempDirectory,
       });
-      const normalizedOptions = normalizeOptions(options);
+      const normalizedOptions = normalizeOptions({
+        ...options,
+        useInferredTasks: false, // Test explicit targets
+      });
 
       await generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
 

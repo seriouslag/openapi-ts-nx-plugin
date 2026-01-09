@@ -214,6 +214,12 @@ export interface OpenApiClientGeneratorSchema {
    * The test runner to use for the project, defaults to `none`
    */
   test?: TestRunner | 'none';
+  /**
+   * Whether to use NX inferred tasks instead of explicit targets.
+   * When true, the generator will only create minimal project configuration
+   * and rely on the plugin to infer targets from openapi-ts.config.ts
+   */
+  useInferredTasks?: boolean;
 }
 
 export default async function (
@@ -355,6 +361,7 @@ export interface NormalizedOptions {
   tagArray: string[];
   tempFolder: string;
   test: TestRunner | 'none';
+  useInferredTasks: boolean;
 }
 
 export type GeneratedOptions = NormalizedOptions &
@@ -438,6 +445,7 @@ export function normalizeOptions(
     tagArray,
     tempFolder,
     test: options.test ?? 'none',
+    useInferredTasks: options.useInferredTasks ?? true,
   };
 }
 
@@ -506,6 +514,7 @@ export async function generateNxProject({
     specFile,
     tagArray,
     test,
+    useInferredTasks,
   } = normalizedOptions;
 
   const specIsAFile = isAFile(specFile);
@@ -595,64 +604,75 @@ export async function generateNxProject({
     : undefined;
 
   // Create basic project structure
+  // When using inferred tasks, we create minimal config and let the plugin infer targets
+  const explicitTargets = useInferredTasks
+    ? {}
+    : {
+        build: {
+          dependsOn: ['^build', 'updateApi'],
+          executor: '@nx/js:tsc',
+          inputs: [{ dependentTasksOutputFiles }, ...baseInputs],
+          options: {
+            additionalEntryPoints,
+            assets: [
+              {
+                glob: 'README.md',
+                input: `./{projectRoot}`,
+                output: '.',
+              },
+            ],
+            generateExportsField: true,
+            generatePackageJson: true,
+            main: `{projectRoot}/src/index.ts`,
+            outputPath: `{projectRoot}/dist`,
+            rootDir: `{projectRoot}/src`,
+            tsConfig: `{projectRoot}/${projectTsConfigName}`,
+          },
+          outputs: ['{projectRoot}/dist'],
+        },
+        generateApi: {
+          executor: 'nx:run-commands',
+          inputs: baseInputs,
+          options: {
+            command: generateClientCommand({
+              clientType,
+              outputPath: generateOutputPath,
+              plugins,
+              specFile: `./${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`,
+            }),
+            cwd: `{projectRoot}`,
+          },
+          outputs: generateOutputs,
+        },
+        // this adds the update-api executor to the generated project
+        updateApi: {
+          cache: true,
+          dependsOn: ['^build'],
+          executor: `${packageJson.name}:update-api`,
+          inputs: updateInputs,
+          options: buildUpdateOptions(normalizedOptions),
+          outputs: [
+            `{projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
+            `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
+          ],
+        },
+        ...(serve ? { serve } : {}),
+      };
+
   addProjectConfiguration(tree, `${projectScope}/${projectName}`, {
     implicitDependencies: dependsOnProject ? [dependsOnProject] : [],
     projectType: 'library',
     root: projectRoot,
     sourceRoot: `{projectRoot}/src`,
     tags: tagArray,
-    targets: {
-      build: {
-        dependsOn: ['^build', 'updateApi'],
-        executor: '@nx/js:tsc',
-        inputs: [{ dependentTasksOutputFiles }, ...baseInputs],
-        options: {
-          additionalEntryPoints,
-          assets: [
-            {
-              glob: 'README.md',
-              input: `./{projectRoot}`,
-              output: '.',
-            },
-          ],
-          generateExportsField: true,
-          generatePackageJson: true,
-          main: `{projectRoot}/src/index.ts`,
-          outputPath: `{projectRoot}/dist`,
-          rootDir: `{projectRoot}/src`,
-          tsConfig: `{projectRoot}/${projectTsConfigName}`,
-        },
-        outputs: ['{projectRoot}/dist'],
-      },
-      generateApi: {
-        executor: 'nx:run-commands',
-        inputs: baseInputs,
-        options: {
-          command: generateClientCommand({
-            clientType,
-            outputPath: generateOutputPath,
-            plugins,
-            specFile: `./${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`,
-          }),
-          cwd: `{projectRoot}`,
-        },
-        outputs: generateOutputs,
-      },
-      // this adds the update-api executor to the generated project
-      updateApi: {
-        cache: true,
-        dependsOn: ['^build'],
-        executor: `${packageJson.name}:update-api`,
-        inputs: updateInputs,
-        options: buildUpdateOptions(normalizedOptions),
-        outputs: [
-          `{projectRoot}/src/${CONSTANTS.GENERATED_DIR_NAME}`,
-          `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
-        ],
-      },
-      ...(serve ? { serve } : {}),
-    },
+    targets: explicitTargets,
   });
+
+  if (useInferredTasks) {
+    logger.info(
+      `Using inferred tasks. Make sure to register the plugin in nx.json: { "plugins": ["@seriouslag/nx-openapi-ts-plugin/plugin"] }`,
+    );
+  }
 
   const stringifyPlugin = (plugin: unknown): string => {
     if (typeof plugin === 'string') {
