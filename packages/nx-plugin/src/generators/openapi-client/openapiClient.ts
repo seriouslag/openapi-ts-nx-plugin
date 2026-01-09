@@ -445,7 +445,7 @@ export function normalizeOptions(
     tagArray,
     tempFolder,
     test: options.test ?? 'none',
-    useInferredTasks: options.useInferredTasks ?? false,
+    useInferredTasks: options.useInferredTasks ?? true,
   };
 }
 
