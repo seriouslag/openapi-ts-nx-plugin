@@ -9,8 +9,11 @@ import {
   resolve,
 } from 'node:path';
 
-import type { JSONSchema } from '@hey-api/json-schema-ref-parser';
-import { createClient } from '@hey-api/openapi-ts';
+import {
+  $RefParser,
+  type JSONSchema,
+} from '@hey-api/json-schema-ref-parser';
+import { createClient, Logger } from '@hey-api/openapi-ts';
 import {
   getSpec,
   initConfigs,
@@ -124,23 +127,39 @@ export async function bundleAndDereferenceSpecFile({
     logger.debug(`Bundling OpenAPI spec file ${specPath}...`);
 
     logger.debug(`Getting spec file...`);
-    const { data, error } = await getSpec({
+    const specResult = await getSpec({
       inputPath: specPath,
       timeout: 10000,
       watch: { headers: new Headers() },
     });
-    if (error) {
-      logger.error(`Failed to get spec file: ${error}`);
-      throw new Error(`Failed to get spec file: ${error}`);
+    if (specResult.error) {
+      logger.error(`Failed to get spec file: ${specResult.error}`);
+      throw new Error(`Failed to get spec file: ${specResult.error}`);
     }
     logger.debug(`Spec file loaded.`);
-    const spec = data;
+
+    // Parse the spec using $RefParser
+    const refParser = new $RefParser();
+    const spec = await refParser.bundle({
+      arrayBuffer: specResult.arrayBuffer,
+      pathOrUrlOrSchema: undefined,
+      resolvedInput: specResult.resolvedInput,
+    });
+
+    // Create a logger instance for openapi-ts
+    const openapiLogger = new Logger();
+
     // loading default config
     logger.debug(`Loading default config...`);
     const configs = await initConfigs({
-      input: specPath,
-      output: outputPath,
-      plugins: [client, ...plugins] as ClientConfig['plugins'],
+      logger: openapiLogger,
+      userConfigs: [
+        {
+          input: specPath,
+          output: outputPath,
+          plugins: [client, ...plugins] as ClientConfig['plugins'],
+        },
+      ],
     });
     // getting the first config
     const dependencies = configs.dependencies;
@@ -166,6 +185,7 @@ export async function bundleAndDereferenceSpecFile({
     const context = parseOpenApiSpec({
       config,
       dependencies,
+      logger: openapiLogger,
       spec,
     });
     if (!context) {
@@ -189,16 +209,24 @@ export async function bundleAndDereferenceSpecFile({
  * Fetches an unparsed spec file
  */
 async function getSpecFile(path: string) {
-  const spec = await getSpec({
+  const specResult = await getSpec({
     inputPath: path,
     timeout: 10000,
     watch: { headers: new Headers() },
   });
-  if (spec.error) {
+  if (specResult.error) {
     throw new Error('Failed to read spec file');
   }
 
-  return spec.data;
+  // Parse the spec using $RefParser
+  const refParser = new $RefParser();
+  const spec = await refParser.bundle({
+    arrayBuffer: specResult.arrayBuffer,
+    pathOrUrlOrSchema: undefined,
+    resolvedInput: specResult.resolvedInput,
+  });
+
+  return spec;
 }
 
 /**

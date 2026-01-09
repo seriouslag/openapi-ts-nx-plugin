@@ -40,8 +40,8 @@
   "executors": "./executors.json",
   "plugin": "./dist/plugin.cjs.js",
   "dependencies": {
-    "@hey-api/json-schema-ref-parser": "^1.0.6",
-    "@hey-api/openapi-ts": "https://pkg.pr.new/hey-api/openapi-ts/@hey-api/openapi-ts@2356",
+    "@hey-api/json-schema-ref-parser": "^1.2.2",
+    "@hey-api/openapi-ts": "^0.90.2",
     "@nx/devkit": "^21.3.10",
     "api-smart-diff": "^1.0.6",
     "latest-version": "^9.0.0",

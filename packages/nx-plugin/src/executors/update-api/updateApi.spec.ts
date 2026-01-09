@@ -14,50 +14,106 @@ import { CONSTANTS } from '../../vars';
 import type { UpdateApiExecutorSchema } from './schema';
 import executor from './updateApi';
 
+vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@hey-api/openapi-ts')>();
+  return {
+    ...actual,
+    createClient: vi.fn(),
+  };
+});
+
+vi.mock('@hey-api/json-schema-ref-parser', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@hey-api/json-schema-ref-parser')>();
+  return {
+    ...actual,
+    $RefParser: vi.fn().mockImplementation(() => ({
+      bundle: vi.fn(() =>
+        Promise.resolve({
+          openapi: '3.0.0',
+          info: { title: 'Test API', version: '1.0.0' },
+          paths: {},
+        }),
+      ),
+    })),
+  };
+});
+
 vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('@hey-api/openapi-ts/internal')>();
   return {
     ...actual,
-    initConfigs: vi.fn((config: Parameters<typeof initConfigs>[0]) =>
-      Promise.resolve({
-        dependencies: [],
-        results: [
-          {
-            config: {
-              input: config?.input ?? 'default-input',
-              output: config?.output ?? 'default-output',
-              parser: {
-                pagination: {
-                  keywords: [
-                    'after',
-                    'before',
-                    'cursor',
-                    'offset',
-                    'page',
-                    'start',
-                  ],
+    getSpec: vi.fn(({ inputPath }: { inputPath: string }) => {
+      // Return error for non-existent or invalid spec files
+      if (
+        inputPath === 'non-existent.yaml' ||
+        inputPath.includes('invalid.yaml')
+      ) {
+        return Promise.resolve({
+          error: 'not-ok' as const,
+          response: { status: 404, statusText: 'Not Found' } as Response,
+        });
+      }
+      return Promise.resolve({
+        arrayBuffer: new ArrayBuffer(0),
+        resolvedInput: {
+          path: inputPath,
+          schema: undefined,
+          type: 'file' as const,
+        },
+      });
+    }),
+    initConfigs: vi.fn(
+      ({ userConfigs }: Parameters<typeof initConfigs>[0]) => {
+        const config = userConfigs?.[0];
+        return Promise.resolve({
+          dependencies: {},
+          results: [
+            {
+              config: {
+                input: [{ path: config?.input ?? 'default-input' }],
+                output: {
+                  path: config?.output ?? 'default-output',
                 },
-                transforms: {
-                  enums: {
-                    case: 'PascalCase',
-                    enabled: false,
-                    mode: 'root',
-                    name: (n: string) => n,
+                parser: {
+                  pagination: {
+                    keywords: [
+                      'after',
+                      'before',
+                      'cursor',
+                      'offset',
+                      'page',
+                      'start',
+                    ],
                   },
-                  readWrite: {
-                    enabled: false,
+                  transforms: {
+                    enums: {
+                      case: 'PascalCase',
+                      enabled: false,
+                      mode: 'root',
+                      name: (n: string) => n,
+                    },
+                    readWrite: {
+                      enabled: false,
+                    },
                   },
+                  validate_EXPERIMENTAL: true,
                 },
-                validate_EXPERIMENTAL: true,
+                plugins: config?.plugins ?? [],
               },
-              plugins: config?.plugins ?? [],
+              errors: [],
+              jobIndex: 0,
             },
-            errors: [],
-          },
-        ],
-      }),
+          ],
+        });
+      },
     ),
+    parseOpenApiSpec: vi.fn(() => ({
+      spec: {
+        name: 'test-name',
+      },
+    })),
   };
 });
 
