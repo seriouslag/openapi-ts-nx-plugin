@@ -4,6 +4,8 @@
   "license": "MIT",
   "scripts": {
     "build": "nx run-many --target=build",
+    "version:check:nx-plugin": "node ./packages/nx-plugin/scripts/version-with-openapi.mjs --check",
+    "version:sync:nx-plugin": "node ./packages/nx-plugin/scripts/version-with-openapi.mjs --write",
     "test": "nx run-many --target=test",
     "publish": "nx run-many --target=publish"
   },

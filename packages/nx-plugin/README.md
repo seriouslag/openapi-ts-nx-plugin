@@ -8,6 +8,25 @@ This plugin provides a generator and executor for generating and updating OpenAP
 npm install -D @seriouslag/nx-openapi-ts-plugin
 ```
 
+## Versioning Policy
+
+This package version tracks `@hey-api/openapi-ts`:
+
+- Major/minor must match `@hey-api/openapi-ts`.
+- Patch can be equal or ahead.
+- For plugin-only patch releases, increment patch by one.
+- When `@hey-api/openapi-ts` patch updates, release the plugin at least one patch ahead of the greater of current plugin/openapi patch.
+
+Helpful commands:
+
+```bash
+# verify policy
+pnpm run version:check:nx-plugin
+
+# update packages/nx-plugin/package.json version to the recommended next value
+pnpm run version:sync:nx-plugin
+```
+
 ## Usage
 
 ### Generators

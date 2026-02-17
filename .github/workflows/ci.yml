@@ -16,15 +16,15 @@ jobs:
             ubuntu-latest,
             # windows-latest # TODO: enable when rollup build works on window
           ]
-        node-version: ['20', '22', '24']
+        node-version: ['22', '24']
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
@@ -37,7 +37,7 @@ jobs:
         run: |
           echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@v5
         name: Setup pnpm cache
         with:
           path: ${{ env.STORE_PATH }}
@@ -47,6 +47,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install
+
+      - name: Check nx-plugin version policy
+        run: pnpm run version:check:nx-plugin
 
       - name: Run tests
         run: pnpm run test
