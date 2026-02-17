@@ -217,7 +217,7 @@ export interface OpenApiClientGeneratorSchema {
   /**
    * Whether to use NX inferred tasks instead of explicit targets.
    * When true, the generator will only create minimal project configuration
-   * and rely on the plugin to infer targets from openapi-ts.config.ts
+   * and rely on the plugin to infer targets from openapi-ts.config.*
    */
   useInferredTasks?: boolean;
 }

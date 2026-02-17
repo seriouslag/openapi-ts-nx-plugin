@@ -9,13 +9,8 @@ import {
   resolve,
 } from 'node:path';
 
-import type { JSONSchema } from '@hey-api/json-schema-ref-parser';
+import { $RefParser, type JSONSchema } from '@hey-api/json-schema-ref-parser';
 import { createClient } from '@hey-api/openapi-ts';
-import {
-  getSpec,
-  initConfigs,
-  parseOpenApiSpec,
-} from '@hey-api/openapi-ts/internal';
 import { logger, workspaceRoot } from '@nx/devkit';
 import { compareOpenApi } from 'api-smart-diff';
 import { format, resolveConfig } from 'prettier';
@@ -110,9 +105,6 @@ export function getPluginName(plugin: Plugin) {
  * Bundle and dereference the new spec file
  */
 export async function bundleAndDereferenceSpecFile({
-  client,
-  outputPath,
-  plugins,
   specPath,
 }: {
   client: string;
@@ -122,61 +114,10 @@ export async function bundleAndDereferenceSpecFile({
 }) {
   try {
     logger.debug(`Bundling OpenAPI spec file ${specPath}...`);
-
-    logger.debug(`Getting spec file...`);
-    const { data, error } = await getSpec({
-      inputPath: specPath,
-      timeout: 10000,
-      watch: { headers: new Headers() },
+    const refParser = new $RefParser();
+    const dereferencedSpec = await refParser.bundle({
+      pathOrUrlOrSchema: specPath,
     });
-    if (error) {
-      logger.error(`Failed to get spec file: ${error}`);
-      throw new Error(`Failed to get spec file: ${error}`);
-    }
-    logger.debug(`Spec file loaded.`);
-    const spec = data;
-    // loading default config
-    logger.debug(`Loading default config...`);
-    const configs = await initConfigs({
-      input: specPath,
-      output: outputPath,
-      plugins: [client, ...plugins] as ClientConfig['plugins'],
-    });
-    // getting the first config
-    const dependencies = configs.dependencies;
-    const firstResult = configs.results[0];
-    if (!firstResult) {
-      logger.error('Failed to load config.');
-      throw new Error('Failed to load config.');
-    }
-    // check if the config is valid
-    const { config, errors } = firstResult;
-    const firstError = errors[0];
-    if (firstError && !config) {
-      logger.error(`Failed to load config: ${firstError.message}`);
-      throw new Error(`Failed to load config: ${firstError.message}`, {
-        cause: firstError,
-      });
-    }
-    if (!config) {
-      logger.error('Failed to load config.');
-      throw new Error('Failed to load config.');
-    }
-    logger.debug(`Parsing spec...`);
-    const context = parseOpenApiSpec({
-      config,
-      dependencies,
-      spec,
-    });
-    if (!context) {
-      logger.error('Failed to parse spec.');
-      throw new Error('Failed to parse spec.');
-    }
-    const dereferencedSpec = context?.spec;
-    if (!dereferencedSpec) {
-      logger.error('Failed to dereference spec.');
-      throw new Error('Failed to dereference spec.');
-    }
     logger.debug(`Spec bundled and dereferenced.`);
     return dereferencedSpec as JSONSchema;
   } catch (error) {
@@ -189,16 +130,11 @@ export async function bundleAndDereferenceSpecFile({
  * Fetches an unparsed spec file
  */
 async function getSpecFile(path: string) {
-  const spec = await getSpec({
-    inputPath: path,
-    timeout: 10000,
-    watch: { headers: new Headers() },
+  const refParser = new $RefParser();
+  const { schema } = await refParser.parse({
+    pathOrUrlOrSchema: path,
   });
-  if (spec.error) {
-    throw new Error('Failed to read spec file');
-  }
-
-  return spec.data;
+  return schema;
 }
 
 /**

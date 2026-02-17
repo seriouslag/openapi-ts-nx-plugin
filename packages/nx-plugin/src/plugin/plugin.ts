@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 import type {
   CreateNodesContextV2,
@@ -75,12 +75,24 @@ function parseOpenApiConfig(configPath: string): {
 
     const content = readFileSync(absolutePath, 'utf-8');
 
-    // Extract input path
-    const inputMatch = content.match(/input:\s*['"`]([^'"`]+)['"`]/);
-    const input = inputMatch?.[1] ?? `${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`;
+    // Extract input path from either:
+    // input: '<path>'
+    // input: { path: '<path>' } or input: { url: '<url>' }
+    const inputMatch =
+      content.match(/input:\s*['"`]([^'"`]+)['"`]/) ??
+      content.match(
+        /input:\s*\{[\s\S]*?(?:path|url):\s*['"`]([^'"`]+)['"`][\s\S]*?\}/,
+      );
+    const input =
+      inputMatch?.[1] ??
+      `${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`;
 
-    // Extract output path
-    const outputMatch = content.match(/output:\s*['"`]([^'"`]+)['"`]/);
+    // Extract output path from either:
+    // output: '<path>'
+    // output: { path: '<path>' }
+    const outputMatch =
+      content.match(/output:\s*['"`]([^'"`]+)['"`]/) ??
+      content.match(/output:\s*\{[\s\S]*?path:\s*['"`]([^'"`]+)['"`][\s\S]*?\}/);
     const output = outputMatch?.[1] ?? `src/${CONSTANTS.GENERATED_DIR_NAME}`;
 
     // Extract plugins array - look for the first plugin which is usually the client
@@ -219,9 +231,11 @@ function createOpenApiTargets(
   }
 
   const {
+    buildTargetName = defaultOptions.buildTargetName,
     generateApiTargetName = defaultOptions.generateApiTargetName,
     updateApiTargetName = defaultOptions.updateApiTargetName,
   } = options;
+  const configFileName = basename(configPath);
 
   const { input, output, plugins, client } = config;
   const { name, scope, directory } = metadata;
@@ -236,7 +250,7 @@ function createOpenApiTargets(
     '{projectRoot}/package.json',
     `{projectRoot}/${CONSTANTS.TS_CONFIG_NAME}`,
     `{projectRoot}/${CONSTANTS.TS_LIB_CONFIG_NAME}`,
-    '{projectRoot}/openapi-ts.config.ts',
+    `{projectRoot}/${configFileName}`,
   ];
 
   const dependentTasksOutputFiles = '**/*.{ts,json,yml,yaml}';
@@ -277,7 +291,7 @@ function createOpenApiTargets(
   // updateApi target - uses the plugin executor
   targets[updateApiTargetName] = {
     cache: true,
-    dependsOn: ['^build'],
+    dependsOn: [`^${buildTargetName}`],
     executor: `${PACKAGE_NAME}:update-api`,
     inputs: updateInputs,
     options: {

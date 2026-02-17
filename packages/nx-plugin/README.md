@@ -39,6 +39,14 @@ Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-client`
 nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --client=@hey-api/client-fetch --scope=@my-app --directory=libs --spec=./spec.yaml --tags=api,openapi
 ```
 
+#### openapi-config
+
+[Docs](./src/generators/openapi-config/README.md)
+
+Generates an `openapi-ts.config.*` file for an existing Nx project.
+
+Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-config`
+
 ### Executors
 
 #### update-api
@@ -112,7 +120,7 @@ When using the generator, you can enable inferred tasks with the `useInferredTas
 nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --scope=@my-app --spec=./spec.yaml --useInferredTasks=true
 ```
 
-This will create a minimal project configuration without explicit targets, relying on the plugin to infer them from the `openapi-ts.config.ts` file.
+This will create a minimal project configuration without explicit targets, relying on the plugin to infer them from the `openapi-ts.config.*` file.
 
 ### Inferred Targets
 

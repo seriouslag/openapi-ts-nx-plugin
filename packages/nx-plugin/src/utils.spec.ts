@@ -4,7 +4,6 @@ import { rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { createClient } from '@hey-api/openapi-ts';
-import { getSpec, type initConfigs } from '@hey-api/openapi-ts/internal';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -32,64 +31,6 @@ vi.mock('@hey-api/openapi-ts', async (importOriginal) => {
   return {
     ...actual,
     createClient: vi.fn(),
-  };
-});
-
-vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import('@hey-api/openapi-ts/internal')>();
-  return {
-    ...actual,
-    getSpec: vi.fn(() =>
-      Promise.resolve({
-        data: {},
-        error: null,
-      }),
-    ),
-    initConfigs: vi.fn((config: Parameters<typeof initConfigs>[0]) =>
-      Promise.resolve({
-        dependencies: [],
-        results: [
-          {
-            config: {
-              input: config?.input ?? 'default-input',
-              output: config?.output ?? 'default-output',
-              parser: {
-                pagination: {
-                  keywords: [
-                    'after',
-                    'before',
-                    'cursor',
-                    'offset',
-                    'page',
-                    'start',
-                  ],
-                },
-                transforms: {
-                  enums: {
-                    case: 'PascalCase',
-                    enabled: false,
-                    mode: 'root',
-                    name: (n: string) => n,
-                  },
-                  readWrite: {
-                    enabled: false,
-                  },
-                },
-                validate_EXPERIMENTAL: true,
-              },
-              plugins: config?.plugins ?? [],
-            },
-            errors: [],
-          },
-        ],
-      }),
-    ),
-    parseOpenApiSpec: vi.fn(() => ({
-      spec: {
-        name: 'test-name',
-      },
-    })),
   };
 });
 
@@ -243,35 +184,14 @@ paths:
       });
 
       expect(dereferencedSpec).toBeDefined();
-      expect((dereferencedSpec as any).name).toBe('test-name');
+      expect((dereferencedSpec as any).openapi).toBe('3.0.0');
 
       // delete temp spec file
       await rm(tempSpecFile, { force: true });
     });
 
     it('should throw error when bundle command fails', async () => {
-      vi.mocked(getSpec).mockImplementationOnce(() =>
-        Promise.reject(new Error('Bundle failed')),
-      );
-
-      // write temp spec file
-      const specAsYaml = `openapi: 3.0.0
-info:
-  title: Test API
-  version: 1.0.0
-paths:
-  /test:
-    get:
-      summary: Test endpoint
-      responses:
-        '200':
-          description: A successful response
-`;
-      const tempSpecFile = join(
-        process.cwd(),
-        `temp-spec-${randomUUID()}.yaml`,
-      );
-      await writeFile(tempSpecFile, specAsYaml);
+      const tempSpecFile = join(process.cwd(), `temp-spec-${randomUUID()}.yaml`);
 
       await expect(() =>
         bundleAndDereferenceSpecFile({
@@ -280,10 +200,7 @@ paths:
           plugins: [],
           specPath: tempSpecFile,
         }),
-      ).rejects.toThrow('Bundle failed');
-
-      // delete temp spec file
-      await rm(tempSpecFile, { force: true });
+      ).rejects.toThrow();
     });
   });
 
