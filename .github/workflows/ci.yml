@@ -51,5 +51,8 @@ jobs:
       - name: Run tests
         run: pnpm run test
 
+      - name: Run nx-plugin e2e
+        run: pnpm nx run @seriouslag/nx-openapi-ts-plugin:e2e
+
       - name: Build
         run: pnpm run build
