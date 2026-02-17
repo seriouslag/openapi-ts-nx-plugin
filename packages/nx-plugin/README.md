@@ -101,9 +101,7 @@ Add the plugin to your `nx.json`:
 
 ```json
 {
-  "plugins": [
-    "@seriouslag/nx-openapi-ts-plugin/plugin"
-  ]
+  "plugins": ["@seriouslag/nx-openapi-ts-plugin/plugin"]
 }
 ```
 

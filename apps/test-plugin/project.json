@@ -10,6 +10,13 @@
       "options": {
         "outputPath": "apps/test-plugin/dist"
       }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint apps/test-plugin --max-warnings=0",
+        "cwd": "{workspaceRoot}"
+      }
     }
   },
   "tags": []

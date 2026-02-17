@@ -151,7 +151,6 @@ const handleWatch: PromiseExecutor<UpdateApiExecutorSchema> = async (
   }
   logger.info(`Watching spec file ${options.spec} for changes...`);
   const watcher = fileWatch(rest.spec);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _ of watcher) {
     logger.info(`Spec file ${options.spec} has changed, updating...`);
     // do not pass the watch flag to the runExecutor as it will cause an infinite loop

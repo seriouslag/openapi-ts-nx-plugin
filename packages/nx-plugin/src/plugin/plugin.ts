@@ -201,7 +201,7 @@ function isUrl(spec: string): boolean {
 /**
  * Builds the spec path for NX inputs
  */
-function buildSpecPath(specPath: string, projectRoot: string): string {
+function buildSpecPath(specPath: string): string {
   if (isUrl(specPath)) {
     return specPath;
   }
@@ -241,7 +241,7 @@ function createOpenApiTargets(
   const { name, scope, directory } = metadata;
 
   // Build spec path for inputs
-  const specInputPath = buildSpecPath(input, projectRoot);
+  const specInputPath = buildSpecPath(input);
   const isRemoteSpec = isUrl(input);
 
   // Base inputs for all targets
