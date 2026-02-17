@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync } from 'node:fs';
-import { rm, writeFile } from 'node:fs/promises';
+import { lstat, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import { createClient } from '@hey-api/openapi-ts';
@@ -8,6 +8,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   bundleAndDereferenceSpecFile,
+  cleanupTempFolder,
   generateClientCode,
   generateClientCommand,
   getBaseTsConfigPath,
@@ -240,6 +241,52 @@ paths:
 
     it('should fail if provided a url', () => {
       expect(isAFile('http://example.com')).toBe(false);
+    });
+  });
+
+  describe('cleanupTempFolder', () => {
+    it('should remove the plugin-tmp parent when it becomes empty', async () => {
+      const originalCwd = process.cwd();
+      const sandbox = join(originalCwd, `temp-cleanup-${randomUUID()}`);
+      await mkdir(sandbox, { recursive: true });
+      process.chdir(sandbox);
+
+      try {
+        const tempFolder = join(process.cwd(), 'plugin-tmp', 'test-run');
+        await mkdir(tempFolder, { recursive: true });
+        await writeFile(join(tempFolder, 'spec.json'), '{}');
+
+        await cleanupTempFolder(tempFolder);
+
+        await expect(lstat(join(process.cwd(), 'plugin-tmp'))).rejects.toThrow();
+      } finally {
+        process.chdir(originalCwd);
+        await rm(sandbox, { force: true, recursive: true });
+      }
+    });
+
+    it('should not remove unrelated temp directories', async () => {
+      const originalCwd = process.cwd();
+      const sandbox = join(originalCwd, `temp-cleanup-${randomUUID()}`);
+      await mkdir(sandbox, { recursive: true });
+      process.chdir(sandbox);
+
+      try {
+        const defaultTempRoot = join(process.cwd(), 'plugin-tmp');
+        const sentinel = join(defaultTempRoot, 'keep');
+        await mkdir(sentinel, { recursive: true });
+
+        const customTemp = join(process.cwd(), 'custom-temp', 'test-run');
+        await mkdir(customTemp, { recursive: true });
+        await writeFile(join(customTemp, 'spec.json'), '{}');
+
+        await cleanupTempFolder(customTemp);
+
+        await expect(lstat(defaultTempRoot)).resolves.toBeDefined();
+      } finally {
+        process.chdir(originalCwd);
+        await rm(sandbox, { force: true, recursive: true });
+      }
     });
   });
 

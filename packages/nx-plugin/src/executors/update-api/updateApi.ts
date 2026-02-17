@@ -13,6 +13,7 @@ import { logger, names } from '@nx/devkit';
 
 import {
   bundleAndDereferenceSpecFile,
+  cleanupTempFolder,
   compareSpecs,
   formatFiles,
   formatStringFromFilePath,
@@ -306,16 +307,9 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
 
 async function cleanup(absoluteTempFolder: string) {
   logger.debug('Cleaning up executor environment...');
-
-  if (existsSync(absoluteTempFolder)) {
-    logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
-    await rm(absoluteTempFolder, { force: true, recursive: true });
-    logger.debug(`Temp folder removed successfully: ${absoluteTempFolder}`);
-  } else {
-    logger.debug(
-      `Temp folder does not exist: ${absoluteTempFolder}. Skipping cleanup.`,
-    );
-  }
+  logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
+  await cleanupTempFolder(absoluteTempFolder);
+  logger.debug(`Temp folder removed successfully: ${absoluteTempFolder}`);
   logger.debug('Executor  cleaned up successfully.');
 }
 

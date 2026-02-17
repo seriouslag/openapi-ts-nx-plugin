@@ -1,8 +1,16 @@
 import { existsSync, lstatSync } from 'node:fs';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
+import {
+  mkdir,
+  readdir,
+  readFile,
+  rm,
+  rmdir,
+  writeFile,
+} from 'node:fs/promises';
 import {
   basename,
   dirname,
+  isAbsolute,
   join,
   normalize,
   relative,
@@ -291,6 +299,39 @@ export function isAFile(isFileSystemFile: string) {
  */
 export async function makeDir(path: string) {
   await mkdir(path, { recursive: true });
+}
+
+/**
+ * Removes the temp folder used for generation/execution and prunes the default
+ * `plugin-tmp` parent directory when it becomes empty.
+ */
+export async function cleanupTempFolder(absoluteTempFolder: string) {
+  await rm(absoluteTempFolder, { force: true, recursive: true });
+
+  const defaultTempRoot = join(process.cwd(), CONSTANTS.TMP_DIR_NAME);
+  const relativeToDefaultRoot = relative(defaultTempRoot, absoluteTempFolder);
+  const isWithinDefaultTempRoot =
+    relativeToDefaultRoot === '' ||
+    (!relativeToDefaultRoot.startsWith('..') &&
+      !isAbsolute(relativeToDefaultRoot));
+
+  if (!isWithinDefaultTempRoot) {
+    return;
+  }
+
+  try {
+    const items = await readdir(defaultTempRoot);
+    if (items.length === 0) {
+      await rmdir(defaultTempRoot);
+    }
+  } catch (error) {
+    const code = (error as NodeJS.ErrnoException).code;
+    // Ignore missing/non-empty parent temp directories.
+    if (code === 'ENOENT' || code === 'ENOTEMPTY') {
+      return;
+    }
+    throw error;
+  }
 }
 
 /**
