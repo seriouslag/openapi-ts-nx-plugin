@@ -11,7 +11,6 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      actions: write
       contents: write
     timeout-minutes: 15
     steps:
@@ -36,7 +35,7 @@ jobs:
       - name: Get pnpm store directory
         shell: bash
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
 
       - uses: actions/cache@v5
         name: Setup pnpm cache
@@ -60,7 +59,7 @@ jobs:
         run: |
           VERSION=$(node -p "require('./packages/nx-plugin/package.json').version")
           TAG="v${VERSION}"
-          echo "TAG=${TAG}" >> "$GITHUB_ENV"
+          echo "TAG=${TAG}" >> $GITHUB_ENV
 
           if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
             echo "Tag ${TAG} already exists."
@@ -79,11 +78,3 @@ jobs:
           git tag "${TAG}"
           git push origin HEAD:main
           git push origin "${TAG}"
-
-      - name: Dispatch publish workflow for tag
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh api \
-            repos/${{ github.repository }}/actions/workflows/publish.yml/dispatches \
-            -f ref="${TAG}"
