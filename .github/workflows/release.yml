@@ -1,7 +1,22 @@
 name: Release
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - packages/nx-plugin/**
+      - .github/workflows/release.yml
   workflow_dispatch:
+    inputs:
+      release_mode:
+        description: Release mode
+        required: false
+        type: choice
+        default: auto
+        options:
+          - auto
+          - sync
+          - patch
 
 concurrency:
   group: release-main
@@ -9,6 +24,9 @@ concurrency:
 
 jobs:
   release:
+    if: >-
+      ${{ github.event_name != 'push' ||
+      !startsWith(github.event.head_commit.message, 'chore(release): v') }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -24,57 +42,125 @@ jobs:
         uses: actions/setup-node@v6
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
 
-      - uses: pnpm/action-setup@v4
-        name: Install pnpm
-        with:
-          version: 9
-          run_install: false
-
-      - name: Get pnpm store directory
+      - name: Determine release strategy
+        id: strategy
         shell: bash
+        env:
+          REQUESTED_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.release_mode || 'auto' }}
         run: |
-          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+          set -euo pipefail
 
-      - uses: actions/cache@v5
-        name: Setup pnpm cache
-        with:
-          path: ${{ env.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
+          LAST_TAG=$(git tag --sort=-version:refname | head -n 1 || true)
+          MODE="none"
+          SHOULD_RELEASE="false"
+          REASON=""
 
-      - name: Install dependencies
-        run: pnpm install
+          if [[ "${REQUESTED_MODE}" != "auto" ]]; then
+            MODE="${REQUESTED_MODE}"
+            SHOULD_RELEASE="true"
+            REASON="manual-${REQUESTED_MODE}"
+          elif [[ -z "${LAST_TAG}" ]]; then
+            MODE="sync"
+            SHOULD_RELEASE="true"
+            REASON="no-existing-tags"
+          else
+            CURRENT_OPENAPI=$(node -e "const pkg=require('./packages/nx-plugin/package.json'); const dep=pkg.dependencies?.['@hey-api/openapi-ts']; const m=(dep || '').match(/(\\d+\\.\\d+\\.\\d+)/); if (!m) throw new Error('Missing @hey-api/openapi-ts dependency version'); process.stdout.write(m[1]);")
+            PREVIOUS_OPENAPI=$(git show "${LAST_TAG}:packages/nx-plugin/package.json" | node -e "const fs=require('node:fs'); const pkg=JSON.parse(fs.readFileSync(0, 'utf8')); const dep=pkg.dependencies?.['@hey-api/openapi-ts']; const m=(dep || '').match(/(\\d+\\.\\d+\\.\\d+)/); if (!m) throw new Error('Missing @hey-api/openapi-ts dependency version in last tag'); process.stdout.write(m[1]);")
 
-      - name: Sync nx-plugin version from policy
-        run: pnpm run version:sync:nx-plugin
-
-      - name: Verify nx-plugin version policy
-        run: pnpm run version:check:nx-plugin
-
-      - name: Create release commit and tag
-        shell: bash
-        run: |
-          VERSION=$(node -p "require('./packages/nx-plugin/package.json').version")
-          TAG="v${VERSION}"
-          echo "TAG=${TAG}" >> $GITHUB_ENV
-
-          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists."
-            exit 1
+            if [[ "${CURRENT_OPENAPI}" != "${PREVIOUS_OPENAPI}" ]]; then
+              MODE="sync"
+              SHOULD_RELEASE="true"
+              REASON="openapi-changed-${PREVIOUS_OPENAPI}-to-${CURRENT_OPENAPI}"
+            elif git diff --quiet "${LAST_TAG}"..HEAD -- packages/nx-plugin; then
+              MODE="none"
+              SHOULD_RELEASE="false"
+              REASON="no-plugin-changes-since-${LAST_TAG}"
+            else
+              MODE="patch"
+              SHOULD_RELEASE="true"
+              REASON="plugin-changes-since-${LAST_TAG}"
+            fi
           fi
 
+          echo "mode=${MODE}" >> $GITHUB_OUTPUT
+          echo "should_release=${SHOULD_RELEASE}" >> $GITHUB_OUTPUT
+          echo "reason=${REASON}" >> $GITHUB_OUTPUT
+          echo "last_tag=${LAST_TAG}" >> $GITHUB_OUTPUT
+          echo "Release strategy: mode=${MODE}, should_release=${SHOULD_RELEASE}, reason=${REASON}, last_tag=${LAST_TAG}"
+
+      - name: Sync nx-plugin version to openapi version
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.strategy.outputs.mode == 'sync' }}
+        run: node ./packages/nx-plugin/scripts/version-with-openapi.mjs --sync
+
+      - name: Bump nx-plugin patch version
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.strategy.outputs.mode == 'patch' }}
+        run: node ./packages/nx-plugin/scripts/version-with-openapi.mjs --bump-patch
+
+      - name: Verify nx-plugin version policy
+        if: ${{ steps.strategy.outputs.should_release == 'true' }}
+        run: node ./packages/nx-plugin/scripts/version-with-openapi.mjs --check
+
+      - name: Prepare release tag
+        if: ${{ steps.strategy.outputs.should_release == 'true' }}
+        id: tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          VERSION=$(node -p "require('./packages/nx-plugin/package.json').version")
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists. Skipping release."
+            echo "skip_existing_tag=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "skip_existing_tag=false" >> $GITHUB_OUTPUT
+
+      - name: Create release commit
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
+        id: release_commit
+        shell: bash
+        run: |
+          set -euo pipefail
+
           if git diff --quiet -- packages/nx-plugin/package.json; then
-            echo "No version change detected in packages/nx-plugin/package.json."
-            exit 1
+            echo "No version change detected in packages/nx-plugin/package.json. Using current HEAD for tag."
+            echo "created_commit=false" >> $GITHUB_OUTPUT
+            exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packages/nx-plugin/package.json
-          git commit -m "chore(release): ${TAG}"
-          git tag "${TAG}"
+          git commit -m "chore(release): ${{ steps.tag.outputs.tag }}"
+          echo "created_commit=true" >> $GITHUB_OUTPUT
+
+      - name: Create release tag
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
+        shell: bash
+        run: |
+          git tag "${{ steps.tag.outputs.tag }}"
+
+      - name: Push release commit
+        if: ${{ steps.release_commit.outputs.created_commit == 'true' }}
+        shell: bash
+        run: |
           git push origin HEAD:main
-          git push origin "${TAG}"
+
+      - name: Push release tag
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
+        shell: bash
+        run: |
+          git push origin "${{ steps.tag.outputs.tag }}"
+
+      - name: No release
+        if: ${{ steps.strategy.outputs.should_release != 'true' || steps.tag.outputs.skip_existing_tag == 'true' }}
+        shell: bash
+        run: |
+          echo "Release skipped."
+          echo "reason=${{ steps.strategy.outputs.reason }}"

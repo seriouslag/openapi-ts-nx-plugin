@@ -8,7 +8,8 @@
     "lint:fix": "nx run-many --target=lint -- --fix",
     "prepare": "lefthook install",
     "version:check:nx-plugin": "node ./packages/nx-plugin/scripts/version-with-openapi.mjs --check",
-    "version:sync:nx-plugin": "node ./packages/nx-plugin/scripts/version-with-openapi.mjs --write",
+    "version:sync:nx-plugin": "node ./packages/nx-plugin/scripts/version-with-openapi.mjs --sync",
+    "version:bump:nx-plugin": "node ./packages/nx-plugin/scripts/version-with-openapi.mjs --bump-patch",
     "test": "nx run-many --target=test",
     "publish": "nx run-many --target=publish"
   },
