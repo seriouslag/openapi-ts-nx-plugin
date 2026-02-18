@@ -1,0 +1,50 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "cli": "nx",
+  "$id": "openapi-config",
+  "title": "OpenAPI Config Generator",
+  "description": "Generate an openapi-ts.config.* file for an existing Nx project",
+  "type": "object",
+  "properties": {
+    "project": {
+      "type": "string",
+      "description": "Project name that should receive the openapi-ts config",
+      "x-prompt": "Which project should receive openapi-ts.config.*?"
+    },
+    "spec": {
+      "type": "string",
+      "description": "OpenAPI input path or URL",
+      "default": "api/spec.yaml"
+    },
+    "output": {
+      "type": "string",
+      "description": "Generated output path",
+      "default": "src/generated"
+    },
+    "client": {
+      "type": "string",
+      "description": "Client plugin to include",
+      "default": "@hey-api/client-fetch"
+    },
+    "plugins": {
+      "type": "array",
+      "description": "Additional plugins to include (defaults to @hey-api/typescript and @hey-api/sdk)",
+      "default": ["@hey-api/typescript", "@hey-api/sdk"],
+      "items": {
+        "type": "string"
+      }
+    },
+    "extension": {
+      "type": "string",
+      "description": "Config file extension",
+      "default": "ts",
+      "enum": ["ts", "js", "mjs", "cjs"]
+    },
+    "overwrite": {
+      "type": "boolean",
+      "description": "Overwrite the config file if it already exists",
+      "default": false
+    }
+  },
+  "required": ["project"]
+}

@@ -12,6 +12,7 @@
         "main": "{projectRoot}/src/index.ts",
         "additionalEntryPoints": [
           "{projectRoot}/src/generators/openapi-client/openapiClient.ts",
+          "{projectRoot}/src/generators/openapi-config/openapiConfig.ts",
           "{projectRoot}/src/executors/update-api/updateApi.ts",
           "{projectRoot}/src/plugin/plugin.ts"
         ],
@@ -45,6 +46,21 @@
             "output": "."
           }
         ]
+      }
+    },
+    "e2e": {
+      "dependsOn": ["build"],
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "vitest run --config vite.e2e.config.mts",
+        "cwd": "{projectRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "eslint packages/nx-plugin --max-warnings=0",
+        "cwd": "{workspaceRoot}"
       }
     }
   },

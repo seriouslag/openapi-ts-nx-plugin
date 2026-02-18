@@ -8,6 +8,25 @@ This plugin provides a generator and executor for generating and updating OpenAP
 npm install -D @seriouslag/nx-openapi-ts-plugin
 ```
 
+## Versioning Policy
+
+This package version tracks `@hey-api/openapi-ts`:
+
+- Major/minor must match `@hey-api/openapi-ts`.
+- Patch can be equal or ahead.
+- For plugin-only patch releases, increment patch by one.
+- When `@hey-api/openapi-ts` patch updates, release the plugin at least one patch ahead of the greater of current plugin/openapi patch.
+
+Helpful commands:
+
+```bash
+# verify policy
+pnpm run version:check:nx-plugin
+
+# update packages/nx-plugin/package.json version to the recommended next value
+pnpm run version:sync:nx-plugin
+```
+
 ## Usage
 
 ### Generators
@@ -38,6 +57,14 @@ Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-client`
 ```bash
 nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --client=@hey-api/client-fetch --scope=@my-app --directory=libs --spec=./spec.yaml --tags=api,openapi
 ```
+
+#### openapi-config
+
+[Docs](./src/generators/openapi-config/README.md)
+
+Generates an `openapi-ts.config.*` file for an existing Nx project.
+
+Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-config`
 
 ### Executors
 
@@ -74,9 +101,7 @@ Add the plugin to your `nx.json`:
 
 ```json
 {
-  "plugins": [
-    "@seriouslag/nx-openapi-ts-plugin/plugin"
-  ]
+  "plugins": ["@seriouslag/nx-openapi-ts-plugin/plugin"]
 }
 ```
 
@@ -112,7 +137,7 @@ When using the generator, you can enable inferred tasks with the `useInferredTas
 nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --scope=@my-app --spec=./spec.yaml --useInferredTasks=true
 ```
 
-This will create a minimal project configuration without explicit targets, relying on the plugin to infer them from the `openapi-ts.config.ts` file.
+This will create a minimal project configuration without explicit targets, relying on the plugin to infer them from the `openapi-ts.config.*` file.
 
 ### Inferred Targets
 

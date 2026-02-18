@@ -6,6 +6,11 @@
       "factory": "./dist/openapiClient.cjs.js",
       "schema": "./dist/openapiClient.schema.json",
       "description": "Generate an OpenAPI client library from an OpenAPI spec file."
+    },
+    "openapi-config": {
+      "factory": "./dist/openapiConfig.cjs.js",
+      "schema": "./dist/openapiConfig.schema.json",
+      "description": "Generate an openapi-ts.config.* file for an existing Nx project."
     }
   }
 }

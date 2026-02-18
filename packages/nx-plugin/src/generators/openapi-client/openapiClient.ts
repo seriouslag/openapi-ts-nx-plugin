@@ -1,5 +1,4 @@
 import { existsSync, writeFileSync } from 'node:fs';
-import { rm } from 'node:fs/promises';
 import { isAbsolute, join, resolve } from 'node:path';
 
 import { defaultPlugins } from '@hey-api/openapi-ts';
@@ -30,6 +29,7 @@ import type { UpdateApiExecutorSchema } from '../../executors/update-api/schema'
 import type { Plugin } from '../../utils';
 import {
   bundleAndDereferenceSpecFile,
+  cleanupTempFolder,
   generateClientCode,
   generateClientCommand,
   getBaseTsConfigPath,
@@ -217,7 +217,7 @@ export interface OpenApiClientGeneratorSchema {
   /**
    * Whether to use NX inferred tasks instead of explicit targets.
    * When true, the generator will only create minimal project configuration
-   * and rely on the plugin to infer targets from openapi-ts.config.ts
+   * and rely on the plugin to infer targets from openapi-ts.config.*
    */
   useInferredTasks?: boolean;
 }
@@ -340,7 +340,7 @@ export default async function (
     throw error;
   } finally {
     logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
-    await rm(absoluteTempFolder, { force: true, recursive: true });
+    await cleanupTempFolder(absoluteTempFolder);
   }
 }
 

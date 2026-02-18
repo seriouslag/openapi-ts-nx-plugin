@@ -13,6 +13,7 @@ import { logger, names } from '@nx/devkit';
 
 import {
   bundleAndDereferenceSpecFile,
+  cleanupTempFolder,
   compareSpecs,
   formatFiles,
   formatStringFromFilePath,
@@ -150,7 +151,6 @@ const handleWatch: PromiseExecutor<UpdateApiExecutorSchema> = async (
   }
   logger.info(`Watching spec file ${options.spec} for changes...`);
   const watcher = fileWatch(rest.spec);
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   for await (const _ of watcher) {
     logger.info(`Spec file ${options.spec} has changed, updating...`);
     // do not pass the watch flag to the runExecutor as it will cause an infinite loop
@@ -306,16 +306,9 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
 
 async function cleanup(absoluteTempFolder: string) {
   logger.debug('Cleaning up executor environment...');
-
-  if (existsSync(absoluteTempFolder)) {
-    logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
-    await rm(absoluteTempFolder, { force: true, recursive: true });
-    logger.debug(`Temp folder removed successfully: ${absoluteTempFolder}`);
-  } else {
-    logger.debug(
-      `Temp folder does not exist: ${absoluteTempFolder}. Skipping cleanup.`,
-    );
-  }
+  logger.debug(`Removing temp folder: ${absoluteTempFolder}`);
+  await cleanupTempFolder(absoluteTempFolder);
+  logger.debug(`Temp folder removed successfully: ${absoluteTempFolder}`);
   logger.debug('Executor  cleaned up successfully.');
 }
 

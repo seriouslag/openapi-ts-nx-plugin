@@ -86,7 +86,7 @@
     },
     "useInferredTasks": {
       "type": "boolean",
-      "description": "Whether to use NX inferred tasks instead of explicit targets. When true, the generator will only create minimal project configuration and rely on the plugin to infer targets from openapi-ts.config.ts",
+      "description": "Whether to use NX inferred tasks instead of explicit targets. When true, the generator will only create minimal project configuration and rely on the plugin to infer targets from openapi-ts.config.*",
       "default": true
     }
   },
