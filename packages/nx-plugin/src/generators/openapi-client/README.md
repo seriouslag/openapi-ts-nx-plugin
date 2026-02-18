@@ -14,17 +14,17 @@ nx generate @seriouslag/nx-openapi-ts-plugin:openapi-client
 
 ## Options
 
-| Option      | Description                                       | Required | Default                 | Type               |
-| ----------- | ------------------------------------------------- | -------- | ----------------------- | ------------------ |
-| `name`      | Library name                                      | Yes      | -                       | string             |
-| `scope`     | Scope of the project                              | Yes      | -                       | string             |
-| `spec`      | Path to the OpenAPI spec file (URL or local path) | Yes      | -                       | string             |
-| `client`    | Type of client to generate                        | No       | `@hey-api/client-fetch` | string             |
-| `directory` | Directory where the library will be created       | No       | `libs`                  | string             |
-| `tags`      | Add tags to the library (comma-separated)         | No       | `api,openapi`           | string[]           |
-| `plugins`   | Additional plugins for client                     | No       | []                      | string[]           |
-| `test`      | Tests to generate                                 | No       | `none`                  | 'none' or 'vitest' |
-| `private`   | Whether to make the generated package private     | No       | `true`                  | boolean            |
+| Option      | Description                                       | Required | Default                 | Type                        |
+| ----------- | ------------------------------------------------- | -------- | ----------------------- | --------------------------- |
+| `name`      | Library name                                      | Yes      | -                       | string                      |
+| `scope`     | Scope of the project                              | Yes      | -                       | string                      |
+| `spec`      | Path to the OpenAPI spec file (URL or local path) | Yes      | -                       | string                      |
+| `client`    | Type of client to generate                        | No       | `@hey-api/client-fetch` | string                      |
+| `directory` | Directory where the library will be created       | No       | `libs`                  | string                      |
+| `tags`      | Add tags to the library (comma-separated)         | No       | `api,openapi`           | string[]                    |
+| `plugins`   | Additional plugins for client                     | No       | []                      | string[]                    |
+| `test`      | Tests to generate                                 | No       | `none`                  | 'none', 'vitest', or 'jest' |
+| `private`   | Whether to make the generated package private     | No       | `true`                  | boolean                     |
 
 ## Examples
 
@@ -40,6 +40,9 @@ nx generate @seriouslag/nx-openapi-ts-plugin:openapi-client my-api --spec=./api-
 
 # Generates with test files
 nx generate @seriouslag/nx-openapi-ts-plugin:openapi-client my-api --spec=./api-specs/my-api.yaml --directory=libs/api --test=vitest
+
+# Generates with Jest test files
+nx generate @seriouslag/nx-openapi-ts-plugin:openapi-client my-api --spec=./api-specs/my-api.yaml --directory=libs/api --test=jest
 ```
 
 ## Generated Project Structure
@@ -51,7 +54,8 @@ libs/<name>/
 ├── api/
 │   └── spec.yaml        # Bundled and dereferenced OpenAPI spec file
 ├── package.json
-├── vitest.config.ts     # Vitest configuration (if test is set to 'vitest')
+├── vite.config.mts      # Vitest configuration (if test is set to 'vitest')
+├── jest.config.cjs      # Jest configuration (if test is set to 'jest')
 ├── README.md
 ├── project.json         # NX project configuration
 ├── tsconfig.json        # root config
@@ -96,5 +100,5 @@ The generator adds the following dependencies to the created project:
 - [x] Make plugins configurable and ability to add additional plugins
 - [x] Support additional client types
 - [x] Dogfood the spec bundling and dereferencing
-- [ ] Support different test frameworks
+- [x] Support different test frameworks (Vitest, Jest)
 - [ ] Add linting generation

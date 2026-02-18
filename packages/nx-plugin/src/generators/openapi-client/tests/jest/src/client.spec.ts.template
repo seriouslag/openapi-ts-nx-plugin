@@ -1,0 +1,9 @@
+import { client } from './generated/client.gen';
+
+describe('Generated API Client', () => {
+  describe('Client Configuration', () => {
+    it('should create client', () => {
+      expect(client).toBeDefined();
+    });
+  });
+});

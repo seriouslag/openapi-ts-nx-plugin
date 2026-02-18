@@ -55,7 +55,7 @@
       "type": "string",
       "description": "The test runner to use",
       "default": "none",
-      "enum": ["none", "vitest"]
+      "enum": ["none", "vitest", "jest"]
     },
     "private": {
       "type": "boolean",

@@ -207,6 +207,48 @@ describe('openapi-client generator', () => {
         tree.exists(`${normalizedOptions.projectRoot}/README.md`),
       ).toBeTruthy();
     });
+
+    it('should generate jest test target and files when requested', async () => {
+      const { options, tree } = await getGeneratorOptions({
+        name: `test-api-${randomUUID()}`,
+        tempDirectory,
+      });
+      const normalizedOptions = normalizeOptions({
+        ...options,
+        test: 'jest',
+        useInferredTasks: false,
+      });
+
+      await generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
+
+      const config = readJson(
+        tree,
+        `${normalizedOptions.projectRoot}/project.json`,
+      );
+      expect(config.targets.test).toBeDefined();
+      expect(config.targets.test.options.command).toBe(
+        'jest --config ./jest.config.cjs',
+      );
+
+      expect(
+        tree.exists(`${normalizedOptions.projectRoot}/jest.config.cjs`),
+      ).toBeTruthy();
+      expect(
+        tree.exists(`${normalizedOptions.projectRoot}/tsconfig.spec.json`),
+      ).toBeTruthy();
+      expect(
+        tree.exists(`${normalizedOptions.projectRoot}/src/client.spec.ts`),
+      ).toBeTruthy();
+
+      const packageJson = readJson(
+        tree,
+        `${normalizedOptions.projectRoot}/package.json`,
+      );
+      expect(packageJson.devDependencies.jest).toBeDefined();
+      expect(packageJson.devDependencies['@types/jest']).toBeDefined();
+      expect(packageJson.devDependencies['@swc/jest']).toBeDefined();
+      expect(packageJson.devDependencies['@swc/core']).toBeDefined();
+    });
   });
 
   describe('generateApi', () => {

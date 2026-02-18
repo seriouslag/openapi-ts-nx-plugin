@@ -133,14 +133,16 @@ export default async function openApiConfigGenerator(
   tree: Tree,
   options: OpenApiConfigGeneratorSchema,
 ) {
+  const defaultSpec = `${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`;
   const {
     client,
     extension = 'ts',
     overwrite = false,
     output = `src/${CONSTANTS.GENERATED_DIR_NAME}`,
     project,
-    spec = `${CONSTANTS.SPEC_DIR_NAME}/${CONSTANTS.SPEC_FILE_NAME}`,
+    spec,
   } = options;
+  const normalizedSpec = spec?.trim() || defaultSpec;
 
   const projectConfig = readProjectConfiguration(tree, project);
   const configPath = `${projectConfig.root}/openapi-ts.config.${extension}`;
@@ -158,7 +160,7 @@ export default async function openApiConfigGenerator(
       : undefined;
   const configContent = renderConfigFile({
     extension,
-    input: spec,
+    input: normalizedSpec,
     jsModuleFormat,
     output,
     plugins,

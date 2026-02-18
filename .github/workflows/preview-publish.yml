@@ -1,0 +1,207 @@
+name: Preview Publish
+
+on:
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: preview-pr-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  preview-publish:
+    if: ${{ github.event.issue.pull_request && startsWith(github.event.comment.body, '/preview') }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write
+      id-token: write
+    timeout-minutes: 15
+
+    steps:
+      - name: Resolve PR and validate commenter permissions
+        id: gate
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue.number;
+            const commenter = context.payload.comment.user.login;
+            const association = context.payload.comment.author_association;
+
+            const trustedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
+            let permission = 'none';
+            try {
+              const response = await github.rest.repos.getCollaboratorPermissionLevel({
+                owner,
+                repo,
+                username: commenter,
+              });
+              permission = response.data.permission;
+            } catch (error) {
+              core.warning(`Could not read collaborator permission for ${commenter}: ${error}`);
+            }
+
+            const trustedPermission = ['admin', 'maintain', 'write'].includes(permission);
+            const trustedAssociation = trustedAssociations.has(association);
+            const authorized = trustedPermission || trustedAssociation;
+
+            core.setOutput('authorized', authorized ? 'true' : 'false');
+            core.setOutput('commenter', commenter);
+
+            if (!authorized) {
+              return;
+            }
+
+            const prResponse = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: issueNumber,
+            });
+            const pr = prResponse.data;
+
+            core.setOutput('pr_number', String(pr.number));
+            core.setOutput('head_sha', pr.head.sha);
+            core.setOutput('head_ref', pr.head.ref);
+            core.setOutput('head_repo', pr.head.repo.full_name);
+
+      - name: Comment when requester is unauthorized
+        if: ${{ steps.gate.outputs.authorized != 'true' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const commenter = context.payload.comment.user.login;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: `@${commenter} only users with write access can run \`/preview\`.`,
+            });
+
+      - name: Checkout PR head
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        uses: actions/checkout@v6
+        with:
+          repository: ${{ steps.gate.outputs.head_repo }}
+          ref: ${{ steps.gate.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: pnpm/action-setup@v4
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        name: Install pnpm
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> "$GITHUB_ENV"
+
+      - uses: actions/cache@v5
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        run: pnpm install
+
+      - name: Build nx plugin package
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        run: pnpm nx build @seriouslag/nx-openapi-ts-plugin
+
+      - name: Set preview package version
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        id: preview
+        env:
+          PR_NUMBER: ${{ steps.gate.outputs.pr_number }}
+        run: |
+          node <<'NODE'
+          const fs = require('node:fs');
+          const path = 'packages/nx-plugin/package.json';
+          const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const baseVersion = (pkg.version || '0.0.0').split('-')[0];
+          const runNumber = process.env.GITHUB_RUN_NUMBER;
+          const runAttempt = process.env.GITHUB_RUN_ATTEMPT;
+          const prNumber = process.env.PR_NUMBER;
+          const previewVersion = `${baseVersion}-pr.${prNumber}.${runNumber}.${runAttempt}`;
+          const distTag = `pr-${prNumber}`;
+
+          pkg.version = previewVersion;
+          fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+
+          const output = process.env.GITHUB_OUTPUT;
+          fs.appendFileSync(output, `preview_version=${previewVersion}\n`);
+          fs.appendFileSync(output, `dist_tag=${distTag}\n`);
+          fs.appendFileSync(output, `package_name=${pkg.name}\n`);
+          NODE
+
+      - name: Publish preview to npm
+        if: ${{ steps.gate.outputs.authorized == 'true' }}
+        run: |
+          npm publish ./packages/nx-plugin \
+            --access public \
+            --tag "${{ steps.preview.outputs.dist_tag }}" \
+            --provenance \
+            --ignore-scripts
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
+
+      - name: Comment preview install instructions
+        if: ${{ success() && steps.gate.outputs.authorized == 'true' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const packageName = '${{ steps.preview.outputs.package_name }}';
+            const distTag = '${{ steps.preview.outputs.dist_tag }}';
+            const version = '${{ steps.preview.outputs.preview_version }}';
+            const sha = '${{ steps.gate.outputs.head_sha }}';
+            const pr = '${{ steps.gate.outputs.pr_number }}';
+
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: [
+                `Preview package published for PR #${pr}.`,
+                '',
+                `- Version: \`${version}\``,
+                `- Dist-tag: \`${distTag}\``,
+                `- Commit: \`${sha}\``,
+                '',
+                'Install with:',
+                `- \`pnpm add -D ${packageName}@${distTag}\``,
+                `- \`npm install --save-dev ${packageName}@${distTag}\``,
+              ].join('\n'),
+            });
+
+      - name: Comment preview publish failure
+        if: ${{ failure() && steps.gate.outputs.authorized == 'true' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: [
+                'Preview publish failed.',
+                '',
+                `Run: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              ].join('\n'),
+            });

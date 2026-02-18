@@ -1,0 +1,23 @@
+module.exports = {
+  displayName: '<%= projectName %>',
+  rootDir: '.',
+  testEnvironment: 'node',
+  testMatch: ['<rootDir>/src/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
+  moduleFileExtensions: ['ts', 'tsx', 'js', 'jsx', 'json'],
+  transform: {
+    '^.+\\.[tj]sx?$': [
+      '@swc/jest',
+      {
+        jsc: {
+          target: 'es2022',
+          parser: {
+            syntax: 'typescript',
+            tsx: true,
+          },
+        },
+      },
+    ],
+  },
+  coverageDirectory:
+    '<%= relativePathToWorkspaceRoot %>coverage/<%= projectDirectory %>/<%= projectName %>',
+};

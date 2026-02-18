@@ -14,7 +14,7 @@
     "spec": {
       "type": "string",
       "description": "OpenAPI input path or URL",
-      "default": "api/spec.yaml"
+      "x-prompt": "Where is the OpenAPI input file? (URI or local file path)"
     },
     "output": {
       "type": "string",
