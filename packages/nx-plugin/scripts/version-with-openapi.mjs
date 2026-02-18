@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseVersionFromRange } from './openapi-version.mjs';
 
 const pluginPackageJsonPath = join(
   process.cwd(),
@@ -19,31 +20,8 @@ function parseVersion(version) {
   };
 }
 
-function parseVersionFromRange(versionRange) {
-  const match = versionRange.match(/(\d+\.\d+\.\d+)/);
-  if (!match) {
-    throw new Error(`Could not extract version from range: ${versionRange}`);
-  }
-
-  return parseVersion(match[1]);
-}
-
 function toVersionString(version) {
   return `${version.major}.${version.minor}.${version.patch}`;
-}
-
-function getRecommendedVersion(current, openapi) {
-  if (current.major !== openapi.major || current.minor !== openapi.minor) {
-    // Realign when major/minor diverges.
-    return openapi;
-  }
-
-  // Keep patch monotonic and always at/above openapi patch.
-  return {
-    major: openapi.major,
-    minor: openapi.minor,
-    patch: Math.max(current.patch, openapi.patch) + 1,
-  };
 }
 
 function isAligned(current, openapi) {
@@ -54,9 +32,45 @@ function isAligned(current, openapi) {
   );
 }
 
+function getSyncedVersion(openapi) {
+  return {
+    major: openapi.major,
+    minor: openapi.minor,
+    patch: openapi.patch,
+  };
+}
+
+function getPatchedVersion(current, openapi) {
+  if (current.major !== openapi.major || current.minor !== openapi.minor) {
+    throw new Error(
+      [
+        'Cannot apply plugin patch bump while major/minor is out of sync.',
+        `- plugin version: ${toVersionString(current)}`,
+        `- openapi version: ${toVersionString(openapi)}`,
+        'Run with --sync first.',
+      ].join('\n'),
+    );
+  }
+
+  return {
+    major: current.major,
+    minor: current.minor,
+    patch: Math.max(current.patch, openapi.patch) + 1,
+  };
+}
+
+function writeVersion(packageJson, fromVersion, toVersion) {
+  packageJson.version = toVersionString(toVersion);
+  writeFileSync(pluginPackageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+  console.log(
+    `Updated packages/nx-plugin/package.json version: ${toVersionString(fromVersion)} -> ${toVersionString(toVersion)}`,
+  );
+}
+
 const args = new Set(process.argv.slice(2));
 const checkOnly = args.has('--check');
-const write = args.has('--write');
+const sync = args.has('--sync') || args.has('--write');
+const bumpPatch = args.has('--bump-patch');
 
 const packageJson = JSON.parse(readFileSync(pluginPackageJsonPath, 'utf8'));
 const currentVersion = parseVersion(packageJson.version);
@@ -68,9 +82,13 @@ if (!openapiRange) {
   );
 }
 
-const openapiVersion = parseVersionFromRange(openapiRange);
-const recommendedVersion = getRecommendedVersion(currentVersion, openapiVersion);
+const openapiVersion = parseVersion(parseVersionFromRange(openapiRange));
 const aligned = isAligned(currentVersion, openapiVersion);
+const patchedRecommendation =
+  currentVersion.major === openapiVersion.major &&
+  currentVersion.minor === openapiVersion.minor
+    ? toVersionString(getPatchedVersion(currentVersion, openapiVersion))
+    : 'not available (run --sync first)';
 
 if (checkOnly) {
   if (!aligned) {
@@ -79,7 +97,7 @@ if (checkOnly) {
         'Version policy check failed.',
         `- plugin version: ${toVersionString(currentVersion)}`,
         `- openapi version: ${toVersionString(openapiVersion)} (from ${openapiRange})`,
-        `- recommended plugin version: ${toVersionString(recommendedVersion)}`,
+        `- recommended synced plugin version: ${toVersionString(getSyncedVersion(openapiVersion))}`,
       ].join('\n'),
     );
     process.exit(1);
@@ -91,12 +109,15 @@ if (checkOnly) {
   process.exit(0);
 }
 
-if (write) {
-  packageJson.version = toVersionString(recommendedVersion);
-  writeFileSync(pluginPackageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
-  console.log(
-    `Updated packages/nx-plugin/package.json version: ${toVersionString(currentVersion)} -> ${toVersionString(recommendedVersion)}`,
-  );
+if (sync) {
+  const syncedVersion = getSyncedVersion(openapiVersion);
+  writeVersion(packageJson, currentVersion, syncedVersion);
+  process.exit(0);
+}
+
+if (bumpPatch) {
+  const patchedVersion = getPatchedVersion(currentVersion, openapiVersion);
+  writeVersion(packageJson, currentVersion, patchedVersion);
   process.exit(0);
 }
 
@@ -105,8 +126,9 @@ console.log(
     `plugin version: ${toVersionString(currentVersion)}`,
     `openapi version: ${toVersionString(openapiVersion)} (from ${openapiRange})`,
     `aligned: ${aligned ? 'yes' : 'no'}`,
-    `recommended next plugin version: ${toVersionString(recommendedVersion)}`,
+    `recommended synced plugin version: ${toVersionString(getSyncedVersion(openapiVersion))}`,
+    `recommended patched plugin version: ${patchedRecommendation}`,
     '',
-    'Use --check to enforce policy or --write to update package.json.',
+    'Use --check to enforce policy, --sync to match openapi, or --bump-patch for plugin-only releases.',
   ].join('\n'),
 );

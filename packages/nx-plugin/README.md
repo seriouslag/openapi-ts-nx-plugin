@@ -12,10 +12,12 @@ npm install -D @seriouslag/nx-openapi-ts-plugin
 
 This package version tracks `@hey-api/openapi-ts`:
 
-- Major/minor must match `@hey-api/openapi-ts`.
-- Patch can be equal or ahead.
-- For plugin-only patch releases, increment patch by one.
-- When `@hey-api/openapi-ts` patch updates, release the plugin at least one patch ahead of the greater of current plugin/openapi patch.
+- For upstream releases, match `@hey-api/openapi-ts` exactly.
+  Example: if openapi-ts is `0.93.0`, plugin release is `0.93.0`.
+- For plugin-only releases, bump patch by one while keeping major/minor aligned.
+  Example: `0.93.0` -> `0.93.1`.
+- If openapi-ts later catches up to the same patch, release at that exact upstream version.
+  Example: plugin `0.93.1` and openapi-ts `0.93.1` are aligned.
 
 Helpful commands:
 
@@ -23,9 +25,17 @@ Helpful commands:
 # verify policy
 pnpm run version:check:nx-plugin
 
-# update packages/nx-plugin/package.json version to the recommended next value
+# set package version to match @hey-api/openapi-ts
 pnpm run version:sync:nx-plugin
+
+# bump patch for plugin-only releases
+pnpm run version:bump:nx-plugin
 ```
+
+Automation in CI:
+
+- `Sync OpenAPI Dependency` checks npm daily and updates `@hey-api/openapi-ts` in this repo.
+- `Release` then syncs plugin version to the upstream version for dependency bumps, or applies patch bumps for plugin-only changes.
 
 ## Usage
 
