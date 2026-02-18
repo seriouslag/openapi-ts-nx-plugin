@@ -120,7 +120,7 @@ const getClientPlugins = ({
 /**
  * The test runner to use
  */
-export type TestRunner = 'vitest';
+export type TestRunner = 'vitest' | 'jest';
 
 /**
  * The test runners and their configurations for generating test files
@@ -133,6 +133,10 @@ const testRunners: Record<
      */
     additionalDevDependencies?: string[];
     /**
+     * The NX target configuration for running tests
+     */
+    targetConfiguration: TargetConfiguration;
+    /**
      * The template path to the test files
      */
     templatePath: string;
@@ -140,7 +144,25 @@ const testRunners: Record<
 > = {
   vitest: {
     additionalDevDependencies: ['vite', 'vitest'],
+    targetConfiguration: {
+      executor: 'nx:run-commands',
+      options: {
+        command: 'vitest run --config ./vite.config.mts',
+        cwd: '{projectRoot}',
+      },
+    },
     templatePath: './tests/vitest',
+  },
+  jest: {
+    additionalDevDependencies: ['@swc/core', '@swc/jest', '@types/jest', 'jest'],
+    targetConfiguration: {
+      executor: 'nx:run-commands',
+      options: {
+        command: 'jest --config ./jest.config.cjs',
+        cwd: '{projectRoot}',
+      },
+    },
+    templatePath: './tests/jest',
   },
 };
 
@@ -656,6 +678,11 @@ export async function generateNxProject({
             `{projectRoot}/${CONSTANTS.SPEC_DIR_NAME}`,
           ],
         },
+        ...(test !== 'none'
+          ? {
+              test: testRunners[test].targetConfiguration,
+            }
+          : {}),
         ...(serve ? { serve } : {}),
       };
 

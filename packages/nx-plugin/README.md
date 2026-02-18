@@ -50,7 +50,7 @@ Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-client`
 - `tags`: The tags to add to the project. [ string[] ] (optional) (default: `api,openapi`)
   The defaults tags will not be added to the project if you specify this option.
 - `plugins`: Additional plugins to provide to the client api. [ string[] ] (optional)
-- `test`: The type of tests to setup. [ 'none' | 'vitest' ] (optional) (default: `none`)
+- `test`: The type of tests to setup. [ 'none' | 'vitest' | 'jest' ] (optional) (default: `none`)
 
 ##### Example
 
@@ -65,6 +65,26 @@ nx g @seriouslag/nx-openapi-ts-plugin:openapi-client --name=my-api --client=@hey
 Generates an `openapi-ts.config.*` file for an existing Nx project.
 
 Run in interactive mode `nx g @seriouslag/nx-openapi-ts-plugin:openapi-config`
+
+##### When to use
+
+Use `openapi-config` when the project already exists and you want to add or refresh only the `openapi-ts.config.*` file.
+
+- Add inferred OpenAPI targets to an existing Nx project.
+- Migrate a manually configured project to plugin-managed config.
+- Recreate config with different options (`spec`, `output`, `plugins`, `extension`).
+
+Use `openapi-client` instead when you need to scaffold a new API client library.
+
+##### Examples
+
+```bash
+# Interactive: prompts for spec when --spec is not passed
+nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api
+
+# Non-interactive: pass spec explicitly (CI-friendly)
+nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api --spec=./api/spec.yaml
+```
 
 ### Executors
 
@@ -90,6 +110,21 @@ If the spec file is a relative path and is located in the workspace then the con
 The assumption is made that that project will generate the API spec file on build.
 
 If the spec file is a URL then we fetch the spec during cache checks to determine if we should rebuild the client code.
+
+## PR Preview Package
+
+This repository supports preview npm publishes from pull requests via a slash command comment.
+
+1. Add a comment to the PR: `/preview`
+2. The workflow publishes a prerelease build tagged as `pr-<pr-number>`.
+3. Install it with:
+   - `pnpm add -D @seriouslag/nx-openapi-ts-plugin@pr-<pr-number>`
+   - `npm install --save-dev @seriouslag/nx-openapi-ts-plugin@pr-<pr-number>`
+
+Notes:
+
+- Only users with write access can trigger `/preview`.
+- Re-running `/preview` updates the same PR dist-tag to the latest preview build.
 
 ## Inferred Tasks (NX Plugin)
 

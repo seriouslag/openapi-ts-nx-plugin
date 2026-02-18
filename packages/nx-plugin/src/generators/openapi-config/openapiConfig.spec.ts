@@ -28,6 +28,23 @@ describe('openapi-config generator', () => {
     expect(configContent).toContain("'@hey-api/sdk'");
   });
 
+  it('should fall back to default spec when spec is empty', async () => {
+    const tree = createTreeWithEmptyWorkspace();
+    addProjectConfiguration(tree, '@test/api', {
+      projectType: 'library',
+      root: 'libs/api',
+    });
+
+    await generator(tree, {
+      project: '@test/api',
+      spec: '   ',
+    });
+
+    const configPath = 'libs/api/openapi-ts.config.ts';
+    const configContent = tree.read(configPath, 'utf-8');
+    expect(configContent).toContain("input: 'api/spec.yaml'");
+  });
+
   it('should generate cjs config when extension is cjs', async () => {
     const tree = createTreeWithEmptyWorkspace();
     addProjectConfiguration(tree, '@test/api', {
