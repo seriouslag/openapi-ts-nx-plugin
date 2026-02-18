@@ -29,10 +29,8 @@ jobs:
             const repo = context.repo.repo;
             const issueNumber = context.payload.issue.number;
             const commenter = context.payload.comment.user.login;
-            const association = context.payload.comment.author_association;
 
-            const trustedAssociations = new Set(['OWNER', 'MEMBER', 'COLLABORATOR']);
-            let permission = 'none';
+            let permission;
             try {
               const response = await github.rest.repos.getCollaboratorPermissionLevel({
                 owner,
@@ -44,9 +42,7 @@ jobs:
               core.warning(`Could not read collaborator permission for ${commenter}: ${error}`);
             }
 
-            const trustedPermission = ['admin', 'maintain', 'write'].includes(permission);
-            const trustedAssociation = trustedAssociations.has(association);
-            const authorized = trustedPermission || trustedAssociation;
+            const authorized = ['admin', 'maintain', 'write'].includes(permission);
 
             core.setOutput('authorized', authorized ? 'true' : 'false');
             core.setOutput('commenter', commenter);
@@ -135,6 +131,12 @@ jobs:
           const fs = require('node:fs');
           const path = 'packages/nx-plugin/package.json';
           const pkg = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const expectedPackageName = '@seriouslag/nx-openapi-ts-plugin';
+          if (pkg.name !== expectedPackageName) {
+            throw new Error(
+              `Unexpected package name "${pkg.name}". Expected "${expectedPackageName}".`
+            );
+          }
           const baseVersion = (pkg.version || '0.0.0').split('-')[0];
           const runNumber = process.env.GITHUB_RUN_NUMBER;
           const runAttempt = process.env.GITHUB_RUN_ATTEMPT;
