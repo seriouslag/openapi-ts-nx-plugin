@@ -32,6 +32,11 @@ pnpm run version:sync:nx-plugin
 pnpm run version:bump:nx-plugin
 ```
 
+Automation in CI:
+
+- `Sync OpenAPI Dependency` checks npm daily and updates `@hey-api/openapi-ts` in this repo.
+- `Release` then syncs plugin version to the upstream version for dependency bumps, or applies patch bumps for plugin-only changes.
+
 ## Usage
 
 ### Generators
