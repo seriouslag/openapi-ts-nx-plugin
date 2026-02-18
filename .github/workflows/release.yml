@@ -1,0 +1,80 @@
+name: Release
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+
+      - uses: pnpm/action-setup@v4
+        name: Install pnpm
+        with:
+          version: 9
+          run_install: false
+
+      - name: Get pnpm store directory
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+
+      - uses: actions/cache@v5
+        name: Setup pnpm cache
+        with:
+          path: ${{ env.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Sync nx-plugin version from policy
+        run: pnpm run version:sync:nx-plugin
+
+      - name: Verify nx-plugin version policy
+        run: pnpm run version:check:nx-plugin
+
+      - name: Create release commit and tag
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./packages/nx-plugin/package.json').version")
+          TAG="v${VERSION}"
+          echo "TAG=${TAG}" >> $GITHUB_ENV
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists."
+            exit 1
+          fi
+
+          if git diff --quiet -- packages/nx-plugin/package.json; then
+            echo "No version change detected in packages/nx-plugin/package.json."
+            exit 1
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add packages/nx-plugin/package.json
+          git commit -m "chore(release): ${TAG}"
+          git tag "${TAG}"
+          git push origin HEAD:main
+          git push origin "${TAG}"

@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - v*.*.*
+  workflow_dispatch:
 
 jobs:
   publish:
@@ -23,6 +24,17 @@ jobs:
         with:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+
+      - name: Verify tag matches package version
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./packages/nx-plugin/package.json').version")
+          EXPECTED_TAG="v${VERSION}"
+
+          if [[ "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]]; then
+            echo "Ref ${GITHUB_REF_NAME} does not match package version ${EXPECTED_TAG}"
+            exit 1
+          fi
 
       - uses: pnpm/action-setup@v4
         name: Install pnpm
