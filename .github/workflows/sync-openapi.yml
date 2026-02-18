@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: sync-openapi-main
+  group: release-main
   cancel-in-progress: false
 
 jobs:
@@ -46,7 +46,7 @@ jobs:
           LATEST_OPENAPI=$(npm view @hey-api/openapi-ts version)
           echo "latest_openapi=${LATEST_OPENAPI}" >> $GITHUB_OUTPUT
 
-          CURRENT_OPENAPI=$(node -e "const pkg=require('./packages/nx-plugin/package.json'); const dep=pkg.dependencies?.['@hey-api/openapi-ts']; const m=(dep || '').match(/(\\d+\\.\\d+\\.\\d+)/); if (!m) throw new Error('Missing @hey-api/openapi-ts dependency version'); process.stdout.write(m[1]);")
+          CURRENT_OPENAPI=$(node ./packages/nx-plugin/scripts/openapi-version.mjs)
           echo "current_openapi=${CURRENT_OPENAPI}" >> $GITHUB_OUTPUT
 
           if [[ "${CURRENT_OPENAPI}" == "${LATEST_OPENAPI}" ]]; then
@@ -54,7 +54,7 @@ jobs:
             exit 0
           fi
 
-          node -e "const fs=require('node:fs'); const path='packages/nx-plugin/package.json'; const pkg=JSON.parse(fs.readFileSync(path, 'utf8')); pkg.dependencies['@hey-api/openapi-ts']=`^${process.argv[1]}`; fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\\n`);" "${LATEST_OPENAPI}"
+          node ./packages/nx-plugin/scripts/openapi-version.mjs --set "${LATEST_OPENAPI}"
           echo "updated=true" >> $GITHUB_OUTPUT
 
       - name: Update lockfile

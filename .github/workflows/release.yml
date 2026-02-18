@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   release:
+    # Prevent an infinite loop when this workflow pushes its own release commit.
     if: >-
       ${{ github.event_name != 'push' ||
       !startsWith(github.event.head_commit.message, 'chore(release): v') }}
@@ -65,21 +66,21 @@ jobs:
             SHOULD_RELEASE="true"
             REASON="no-existing-tags"
           else
-            CURRENT_OPENAPI=$(node -e "const pkg=require('./packages/nx-plugin/package.json'); const dep=pkg.dependencies?.['@hey-api/openapi-ts']; const m=(dep || '').match(/(\\d+\\.\\d+\\.\\d+)/); if (!m) throw new Error('Missing @hey-api/openapi-ts dependency version'); process.stdout.write(m[1]);")
-            PREVIOUS_OPENAPI=$(git show "${LAST_TAG}:packages/nx-plugin/package.json" | node -e "const fs=require('node:fs'); const pkg=JSON.parse(fs.readFileSync(0, 'utf8')); const dep=pkg.dependencies?.['@hey-api/openapi-ts']; const m=(dep || '').match(/(\\d+\\.\\d+\\.\\d+)/); if (!m) throw new Error('Missing @hey-api/openapi-ts dependency version in last tag'); process.stdout.write(m[1]);")
+            CURRENT_OPENAPI=$(node ./packages/nx-plugin/scripts/openapi-version.mjs)
+            PREVIOUS_OPENAPI=$(node ./packages/nx-plugin/scripts/openapi-version.mjs --ref "${LAST_TAG}" 2>/dev/null || echo "unknown")
 
             if [[ "${CURRENT_OPENAPI}" != "${PREVIOUS_OPENAPI}" ]]; then
               MODE="sync"
               SHOULD_RELEASE="true"
               REASON="openapi-changed-${PREVIOUS_OPENAPI}-to-${CURRENT_OPENAPI}"
-            elif git diff --quiet "${LAST_TAG}"..HEAD -- packages/nx-plugin; then
-              MODE="none"
-              SHOULD_RELEASE="false"
-              REASON="no-plugin-changes-since-${LAST_TAG}"
-            else
+            elif ! git diff --quiet "${LAST_TAG}"..HEAD -- packages/nx-plugin; then
               MODE="patch"
               SHOULD_RELEASE="true"
               REASON="plugin-changes-since-${LAST_TAG}"
+            else
+              MODE="none"
+              SHOULD_RELEASE="false"
+              REASON="no-plugin-changes-since-${LAST_TAG}"
             fi
           fi
 
@@ -121,42 +122,27 @@ jobs:
 
           echo "skip_existing_tag=false" >> $GITHUB_OUTPUT
 
-      - name: Create release commit
+      - name: Create release artifacts and push
         if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
-        id: release_commit
         shell: bash
         run: |
           set -euo pipefail
 
+          TAG="${{ steps.tag.outputs.tag }}"
+
           if git diff --quiet -- packages/nx-plugin/package.json; then
-            echo "No version change detected in packages/nx-plugin/package.json. Using current HEAD for tag."
-            echo "created_commit=false" >> $GITHUB_OUTPUT
+            echo "No version change detected in packages/nx-plugin/package.json. Tagging current HEAD."
+            git tag "${TAG}"
+            git push origin "${TAG}"
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add packages/nx-plugin/package.json
-          git commit -m "chore(release): ${{ steps.tag.outputs.tag }}"
-          echo "created_commit=true" >> $GITHUB_OUTPUT
-
-      - name: Create release tag
-        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
-        shell: bash
-        run: |
-          git tag "${{ steps.tag.outputs.tag }}"
-
-      - name: Push release commit
-        if: ${{ steps.release_commit.outputs.created_commit == 'true' }}
-        shell: bash
-        run: |
-          git push origin HEAD:main
-
-      - name: Push release tag
-        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
-        shell: bash
-        run: |
-          git push origin "${{ steps.tag.outputs.tag }}"
+          git commit -m "chore(release): ${TAG}"
+          git tag "${TAG}"
+          git push origin HEAD:main "${TAG}"
 
       - name: No release
         if: ${{ steps.strategy.outputs.should_release != 'true' || steps.tag.outputs.skip_existing_tag == 'true' }}

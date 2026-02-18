@@ -1,5 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { parseVersionFromRange } from './openapi-version.mjs';
 
 const pluginPackageJsonPath = join(
   process.cwd(),
@@ -17,15 +18,6 @@ function parseVersion(version) {
     minor: Number(match[2]),
     patch: Number(match[3]),
   };
-}
-
-function parseVersionFromRange(versionRange) {
-  const match = versionRange.match(/(\d+\.\d+\.\d+)/);
-  if (!match) {
-    throw new Error(`Could not extract version from range: ${versionRange}`);
-  }
-
-  return parseVersion(match[1]);
 }
 
 function toVersionString(version) {
@@ -90,8 +82,13 @@ if (!openapiRange) {
   );
 }
 
-const openapiVersion = parseVersionFromRange(openapiRange);
+const openapiVersion = parseVersion(parseVersionFromRange(openapiRange));
 const aligned = isAligned(currentVersion, openapiVersion);
+const patchedRecommendation =
+  currentVersion.major === openapiVersion.major &&
+  currentVersion.minor === openapiVersion.minor
+    ? toVersionString(getPatchedVersion(currentVersion, openapiVersion))
+    : 'not available (run --sync first)';
 
 if (checkOnly) {
   if (!aligned) {
@@ -130,12 +127,7 @@ console.log(
     `openapi version: ${toVersionString(openapiVersion)} (from ${openapiRange})`,
     `aligned: ${aligned ? 'yes' : 'no'}`,
     `recommended synced plugin version: ${toVersionString(getSyncedVersion(openapiVersion))}`,
-    `recommended patched plugin version: ${toVersionString(
-      currentVersion.major === openapiVersion.major &&
-        currentVersion.minor === openapiVersion.minor
-        ? getPatchedVersion(currentVersion, openapiVersion)
-        : getSyncedVersion(openapiVersion),
-    )}`,
+    `recommended patched plugin version: ${patchedRecommendation}`,
     '',
     'Use --check to enforce policy, --sync to match openapi, or --bump-patch for plugin-only releases.',
   ].join('\n'),
