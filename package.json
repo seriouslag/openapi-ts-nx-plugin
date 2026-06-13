@@ -1,6 +1,9 @@
 {
   "name": "@seriouslag/source",
   "version": "0.0.0",
+  "bugs": {
+    "url": "https://github.com/seriouslag/openapi-ts-nx-plugin/issues"
+  },
   "license": "MIT",
   "scripts": {
     "build": "nx run-many --target=build",
