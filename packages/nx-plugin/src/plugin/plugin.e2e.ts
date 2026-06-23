@@ -1,10 +1,20 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
 import { workspaceRoot } from '@nx/devkit';
 import { afterEach, describe, expect, it } from 'vitest';
+
+// Resolve the nx CLI entry from its package manifest so this keeps working
+// across nx versions (nx 23 moved the bin from `bin/nx.js` to `dist/bin/nx.js`).
+const require = createRequire(import.meta.url);
+const nxManifestPath = require.resolve('nx/package.json');
+const nxBin = join(
+  dirname(nxManifestPath),
+  (require(nxManifestPath) as { bin: { nx: string } }).bin.nx,
+);
 
 type ConfigExtension = 'cjs' | 'js' | 'mjs' | 'ts';
 
@@ -66,7 +76,6 @@ function writeWorkspace({
 }
 
 function readProjectJson(cwd: string, projectName: string) {
-  const nxBin = join(workspaceRoot, 'node_modules/nx/bin/nx.js');
   const output = execFileSync(
     'node',
     [nxBin, 'show', 'project', projectName, '--json'],

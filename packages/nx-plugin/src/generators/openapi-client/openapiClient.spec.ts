@@ -35,8 +35,8 @@ vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
         results: [
           {
             config: {
-              input: config?.input ?? 'default-input',
-              output: config?.output ?? 'default-output',
+              input: config?.userConfigs?.[0]?.input ?? 'default-input',
+              output: config?.userConfigs?.[0]?.output ?? 'default-output',
               parser: {
                 pagination: {
                   keywords: [
@@ -61,7 +61,7 @@ vi.mock('@hey-api/openapi-ts/internal', async (importOriginal) => {
                 },
                 validate_EXPERIMENTAL: true,
               },
-              plugins: config?.plugins ?? [],
+              plugins: config?.userConfigs?.[0]?.plugins ?? [],
             },
             errors: [],
           },
