@@ -1,22 +1,43 @@
 name: Publish
 
+# Publishes @seriouslag/nx-openapi-ts-plugin to npm using OIDC trusted
+# publishing — no long-lived NPM token required. The trusted publisher must be
+# configured on npmjs.com for THIS workflow file (publish.yml), because npm
+# validates the entry-point workflow that initiated the run.
 on:
   push:
     tags:
       - v*.*.*
   workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag to publish (e.g. v0.99.0). Required for manual runs.
+        required: false
+        type: string
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write # needed for provenance data generation
+      id-token: write # required for OIDC trusted publishing + provenance
     timeout-minutes: 10
     steps:
+      - name: Resolve ref to publish
+        id: ref
+        shell: bash
+        run: |
+          set -euo pipefail
+          # On a tag push, github.ref_name is the tag. On a manual dispatch it
+          # is the branch, so fall back to the provided tag input.
+          REF="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "ref=${REF}" >> "$GITHUB_OUTPUT"
+          echo "Publishing ref: ${REF}"
+
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
+          ref: ${{ steps.ref.outputs.ref }}
           fetch-depth: 0
 
       - name: Setup Node.js
@@ -25,14 +46,20 @@ jobs:
           node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
+      - name: Ensure npm supports trusted publishing (>= 11.5.1)
+        run: npm install -g npm@latest
+
       - name: Verify tag matches package version
         shell: bash
         run: |
+          set -euo pipefail
           VERSION=$(node -p "require('./packages/nx-plugin/package.json').version")
           EXPECTED_TAG="v${VERSION}"
+          REF="${{ steps.ref.outputs.ref }}"
 
-          if [[ "${GITHUB_REF_NAME}" != "${EXPECTED_TAG}" ]]; then
-            echo "Ref ${GITHUB_REF_NAME} does not match package version ${EXPECTED_TAG}"
+          if [[ "${REF}" != "${EXPECTED_TAG}" ]]; then
+            echo "Ref ${REF} does not match package version ${EXPECTED_TAG}"
+            echo "For a manual run, pass the matching tag via the 'tag' input."
             exit 1
           fi
 
@@ -64,13 +91,10 @@ jobs:
       - name: Build
         run: pnpm run build
 
-      - name: Print Environment Info
-        run: npx nx report
-        shell: bash
-
-      - name: Publish packages
-        run: npx nx release publish
-        shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_ACCESS_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
+      # Publish via the npm CLI (not pnpm): npm >= 11.5.1 performs the OIDC
+      # token exchange for trusted publishing. pnpm does not support OIDC yet
+      # (pnpm/pnpm#9812), so the upload must go through npm. Provenance is set
+      # explicitly because it is not reliably automatic.
+      - name: Publish to npm (OIDC trusted publishing)
+        run: npm publish --provenance --access public
+        working-directory: packages/nx-plugin
