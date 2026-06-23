@@ -1,7 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join, resolve } from 'node:path';
 
-import { defaultPlugins } from '@hey-api/openapi-ts';
 import type {
   ProjectConfiguration,
   TargetConfiguration,
@@ -44,6 +43,12 @@ import {
 import { CONSTANTS } from '../../vars';
 
 const defaultTempFolder = join(process.cwd(), CONSTANTS.TMP_DIR_NAME);
+
+// @hey-api/openapi-ts is ESM-only and cannot be require()d from this CJS build,
+// so we can't import its `defaultPlugins` value at module scope (it's used in
+// the synchronous normalizeOptions). Mirror it locally; a guard test asserts
+// this stays in sync with the upstream value.
+export const defaultPlugins = ['@hey-api/typescript', '@hey-api/sdk'] as const;
 
 /**
  * Plugin configuration for the OpenAPI client generator
