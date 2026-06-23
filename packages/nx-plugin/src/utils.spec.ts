@@ -9,6 +9,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   bundleAndDereferenceSpecFile,
   cleanupTempFolder,
+  findOpenApiConfigFile,
   generateClientCode,
   generateClientCommand,
   getBaseTsConfigPath,
@@ -154,6 +155,66 @@ describe('utils', () => {
         }),
       ).rejects.toThrow('Command failed');
     });
+
+    it('should pass configFile to createClient when provided', async () => {
+      await expect(
+        generateClientCode({
+          clientType: '@hey-api/client-fetch',
+          configFile: '/project/openapi-ts.config.mts',
+          outputPath: './src/generated',
+          plugins: ['@hey-api/typescript', '@hey-api/sdk'],
+          specFile: './api/spec.yaml',
+        }),
+      ).resolves.not.toThrow();
+
+      expect(createClient).toHaveBeenCalledWith({
+        configFile: '/project/openapi-ts.config.mts',
+        input: './api/spec.yaml',
+        output: './src/generated',
+        plugins: [
+          '@hey-api/client-fetch',
+          '@hey-api/typescript',
+          '@hey-api/sdk',
+        ],
+      });
+    });
+
+    it('should not pass configFile to createClient when omitted', async () => {
+      await generateClientCode({
+        clientType: '@hey-api/client-fetch',
+        outputPath: './src/generated',
+        plugins: ['@hey-api/typescript', '@hey-api/sdk'],
+        specFile: './api/spec.yaml',
+      });
+
+      const lastCall = vi.mocked(createClient).mock.calls.at(-1)?.[0];
+      expect(lastCall).not.toHaveProperty('configFile');
+    });
+  });
+
+  describe('findOpenApiConfigFile', () => {
+    it('returns the first matching config file path', () => {
+      vi.mocked(existsSync).mockImplementation(
+        (p) => p === join('/project', 'openapi-ts.config.ts'),
+      );
+      expect(findOpenApiConfigFile('/project')).toBe(
+        join('/project', 'openapi-ts.config.ts'),
+      );
+    });
+
+    it('resolves .mts when .ts is absent', () => {
+      vi.mocked(existsSync).mockImplementation(
+        (p) => p === join('/project', 'openapi-ts.config.mts'),
+      );
+      expect(findOpenApiConfigFile('/project')).toBe(
+        join('/project', 'openapi-ts.config.mts'),
+      );
+    });
+
+    it('returns undefined when no config file exists', () => {
+      vi.mocked(existsSync).mockReturnValue(false);
+      expect(findOpenApiConfigFile('/project')).toBeUndefined();
+    });
   });
 
   describe('bundleAndDereferenceSpecFile', () => {
@@ -192,7 +253,10 @@ paths:
     });
 
     it('should throw error when bundle command fails', async () => {
-      const tempSpecFile = join(process.cwd(), `temp-spec-${randomUUID()}.yaml`);
+      const tempSpecFile = join(
+        process.cwd(),
+        `temp-spec-${randomUUID()}.yaml`,
+      );
 
       await expect(() =>
         bundleAndDereferenceSpecFile({
@@ -258,7 +322,9 @@ paths:
 
         await cleanupTempFolder(tempFolder);
 
-        await expect(lstat(join(process.cwd(), 'plugin-tmp'))).rejects.toThrow();
+        await expect(
+          lstat(join(process.cwd(), 'plugin-tmp')),
+        ).rejects.toThrow();
       } finally {
         process.chdir(originalCwd);
         await rm(sandbox, { force: true, recursive: true });

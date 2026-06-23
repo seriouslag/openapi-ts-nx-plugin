@@ -15,6 +15,7 @@ import {
   bundleAndDereferenceSpecFile,
   cleanupTempFolder,
   compareSpecs,
+  findOpenApiConfigFile,
   formatFiles,
   formatStringFromFilePath,
   generateClientCode,
@@ -222,9 +223,11 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       await makeDir(absoluteGeneratedTempDir);
     }
 
-    // Generate new client code
+    // Generate new client code. Pass the project's openapi-ts.config.* (if
+    // present) so config-only settings such as parser.hooks are honoured.
     await generateClientCode({
       clientType: options.client,
+      configFile: findOpenApiConfigFile(join(process.cwd(), projectRoot)),
       outputPath: generatedTempDir,
       plugins: options.plugins,
       specFile: tempSpecPath,
