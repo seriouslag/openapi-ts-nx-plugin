@@ -84,8 +84,9 @@ const OPENAPI_CONFIG_EXTENSIONS = ['ts', 'mts', 'cts', 'mjs', 'cjs', 'js'];
  * option. Returns `undefined` when no config file is present.
  */
 export function findOpenApiConfigFile(projectRoot: string): string | undefined {
+  const absoluteRoot = resolve(projectRoot);
   for (const extension of OPENAPI_CONFIG_EXTENSIONS) {
-    const candidate = join(projectRoot, `openapi-ts.config.${extension}`);
+    const candidate = join(absoluteRoot, `openapi-ts.config.${extension}`);
     if (existsSync(candidate)) {
       return candidate;
     }
@@ -130,10 +131,10 @@ export async function generateClientCode({
     const { createClient } = await import('@hey-api/openapi-ts');
     await createClient({
       ...(configFile ? { configFile } : {}),
+      ...(watch !== undefined ? { watch } : {}),
       input: specFile,
       output: outputPath,
       plugins: [clientType, ...pluginNames] as ClientConfig['plugins'],
-      watch,
     });
     logger.info(`Generated client code successfully.`);
   } catch (error) {
