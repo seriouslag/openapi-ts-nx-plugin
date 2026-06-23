@@ -74,16 +74,46 @@ type ClientConfig = Extract<
 >;
 
 /**
- * Generates the client code using the spec file
+ * Supported `openapi-ts.config.*` file extensions, in resolution order.
+ */
+const OPENAPI_CONFIG_EXTENSIONS = ['ts', 'mts', 'cts', 'mjs', 'cjs', 'js'];
+
+/**
+ * Locates a project's `openapi-ts.config.*` file, if one exists. Returns the
+ * absolute path so `@hey-api/openapi-ts` can load it via its `configFile`
+ * option. Returns `undefined` when no config file is present.
+ */
+export function findOpenApiConfigFile(projectRoot: string): string | undefined {
+  const absoluteRoot = resolve(projectRoot);
+  for (const extension of OPENAPI_CONFIG_EXTENSIONS) {
+    const candidate = join(absoluteRoot, `openapi-ts.config.${extension}`);
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  return undefined;
+}
+
+/**
+ * Generates the client code using the spec file.
+ *
+ * When the project has an `openapi-ts.config.*` file, its path is passed to
+ * `createClient` so settings that have no executor option — most importantly
+ * `parser.hooks` (e.g. classifying a POST endpoint as a query) and `output`
+ * tweaks — are honoured. The executor-derived `input`, `output`, and `plugins`
+ * still win, because `@hey-api/openapi-ts` deep-merges the passed config over
+ * the loaded file (`mergeConfigs(fileConfig, userConfig)`).
  */
 export async function generateClientCode({
   clientType,
+  configFile,
   outputPath,
   plugins,
   specFile,
   watch,
 }: {
   clientType: string;
+  configFile?: string;
   outputPath: string;
   plugins: Plugin[];
   specFile: string;
@@ -92,15 +122,19 @@ export async function generateClientCode({
   try {
     const pluginNames = plugins.map(getPluginName);
     logger.info(`Generating client code using spec file...`);
+    if (configFile) {
+      logger.debug(`Using openapi-ts config file: ${configFile}`);
+    }
 
     // Dynamic import: @hey-api/openapi-ts is ESM-only and cannot be require()d
     // from this CJS build.
     const { createClient } = await import('@hey-api/openapi-ts');
     await createClient({
+      ...(configFile ? { configFile } : {}),
+      ...(watch !== undefined ? { watch } : {}),
       input: specFile,
       output: outputPath,
       plugins: [clientType, ...pluginNames] as ClientConfig['plugins'],
-      watch,
     });
     logger.info(`Generated client code successfully.`);
   } catch (error) {
