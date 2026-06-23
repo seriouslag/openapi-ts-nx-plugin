@@ -21,29 +21,44 @@
         "rootDir": "{projectRoot}/src",
         "assets": [
           {
-            "glob": "{executors,generators,plugin}/**/*.json",
-            "input": "{projectRoot}/src",
+            "glob": "updateApi.schema.json",
+            "input": "{projectRoot}/src/executors/update-api",
             "output": "."
           },
           {
-            "glob": "files",
+            "glob": "openapiClient.schema.json",
             "input": "{projectRoot}/src/generators/openapi-client",
             "output": "."
           },
           {
-            "glob": "options",
-            "input": "{projectRoot}/src/generators/openapi-client",
+            "glob": "openapiConfig.schema.json",
+            "input": "{projectRoot}/src/generators/openapi-config",
             "output": "."
           },
           {
-            "glob": "plugins",
-            "input": "{projectRoot}/src/generators/openapi-client",
+            "glob": "plugin.schema.json",
+            "input": "{projectRoot}/src/plugin",
             "output": "."
           },
           {
-            "glob": "tests",
-            "input": "{projectRoot}/src/generators/openapi-client",
-            "output": "."
+            "glob": "**/*",
+            "input": "{projectRoot}/src/generators/openapi-client/files",
+            "output": "files"
+          },
+          {
+            "glob": "**/*",
+            "input": "{projectRoot}/src/generators/openapi-client/options",
+            "output": "options"
+          },
+          {
+            "glob": "**/*",
+            "input": "{projectRoot}/src/generators/openapi-client/plugins",
+            "output": "plugins"
+          },
+          {
+            "glob": "**/*",
+            "input": "{projectRoot}/src/generators/openapi-client/tests",
+            "output": "tests"
           }
         ]
       }
