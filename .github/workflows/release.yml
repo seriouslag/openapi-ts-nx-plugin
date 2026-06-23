@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      actions: write # dispatch the Publish workflow after tagging
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -143,6 +144,22 @@ jobs:
           git commit -m "chore(release): ${TAG}"
           git tag "${TAG}"
           git push origin HEAD:main "${TAG}"
+
+      - name: Trigger publish workflow
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          TAG="${{ steps.tag.outputs.tag }}"
+          echo "Dispatching Publish workflow for ${TAG}"
+          # Dispatch against main so the latest publish.yml (OIDC) runs; it
+          # checks out the tag for the actual code and version. A tag push made
+          # with GITHUB_TOKEN does not trigger workflows, but workflow_dispatch
+          # is exempt from that rule, so this needs no PAT/App token.
+          gh workflow run publish.yml --ref main -f tag="${TAG}"
 
       - name: No release
         if: ${{ steps.strategy.outputs.should_release != 'true' || steps.tag.outputs.skip_existing_tag == 'true' }}
