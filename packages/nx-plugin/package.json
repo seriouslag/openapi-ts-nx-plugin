@@ -17,20 +17,20 @@
   "type": "commonjs",
   "main": "./dist/index.cjs.js",
   "module": "./dist/index.cjs.js",
-  "types": "./dist/index.cjs.d.ts",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "typecheck": "tsc --noEmit"
   },
   "exports": {
     ".": {
       "require": {
-        "types": "./dist/index.cjs.d.ts",
+        "types": "./dist/index.d.ts",
         "default": "./dist/index.cjs.js"
       }
     },
     "./plugin": {
       "require": {
-        "types": "./dist/plugin.cjs.d.ts",
+        "types": "./dist/plugin.d.ts",
         "default": "./dist/plugin.cjs.js"
       }
     },
