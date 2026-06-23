@@ -17,8 +17,7 @@ import {
   resolve,
 } from 'node:path';
 
-import { $RefParser, type JSONSchema } from '@hey-api/json-schema-ref-parser';
-import { createClient } from '@hey-api/openapi-ts';
+import type { JSONSchema } from '@hey-api/json-schema-ref-parser';
 import { logger, workspaceRoot } from '@nx/devkit';
 import { compareOpenApi } from 'api-smart-diff';
 import { format, resolveConfig } from 'prettier';
@@ -61,7 +60,12 @@ export function getPackageName(packageName: string) {
     : packageName;
 }
 
-type ConfigOptions = NonNullable<Parameters<typeof createClient>[0]>;
+// `@hey-api/openapi-ts` is ESM-only; reference its type via an import-type so
+// nothing is require()d at runtime (the value is loaded with dynamic import
+// below). See generateClientCode.
+type ConfigOptions = NonNullable<
+  Parameters<typeof import('@hey-api/openapi-ts').createClient>[0]
+>;
 type ClientConfig = Extract<
   ConfigOptions,
   {
@@ -89,6 +93,9 @@ export async function generateClientCode({
     const pluginNames = plugins.map(getPluginName);
     logger.info(`Generating client code using spec file...`);
 
+    // Dynamic import: @hey-api/openapi-ts is ESM-only and cannot be require()d
+    // from this CJS build.
+    const { createClient } = await import('@hey-api/openapi-ts');
     await createClient({
       input: specFile,
       output: outputPath,
@@ -122,6 +129,8 @@ export async function bundleAndDereferenceSpecFile({
 }) {
   try {
     logger.debug(`Bundling OpenAPI spec file ${specPath}...`);
+    // Dynamic import: @hey-api/json-schema-ref-parser is ESM-only.
+    const { $RefParser } = await import('@hey-api/json-schema-ref-parser');
     const refParser = new $RefParser();
     const dereferencedSpec = await refParser.bundle({
       pathOrUrlOrSchema: specPath,
@@ -138,6 +147,8 @@ export async function bundleAndDereferenceSpecFile({
  * Fetches an unparsed spec file
  */
 async function getSpecFile(path: string) {
+  // Dynamic import: @hey-api/json-schema-ref-parser is ESM-only.
+  const { $RefParser } = await import('@hey-api/json-schema-ref-parser');
   const refParser = new $RefParser();
   const { schema } = await refParser.parse({
     pathOrUrlOrSchema: path,
