@@ -89,8 +89,45 @@ describe('plugin createNodesV2', () => {
       expect(updateApiTarget?.outputs).toContain(
         '{projectRoot}/src/generated-custom',
       );
+
+      // Uses the installed binary directly — not npx — so pnpm strict hoisting
+      // does not cause a fresh download instead of using the pre-installed package.
+      expect(generateApiTarget?.options?.command).toBe('openapi-ts');
+      expect(generateApiTarget?.options?.command).not.toMatch(/^npx/);
     },
   );
+
+  it('remote spec hash input uses xcurl binary directly, not npx', async () => {
+    const { tempProjectRoot } = writeConfigFixture('ts');
+    const root = tempProjectRoot.split('/libs/')[0] || tempProjectRoot;
+    createdRoots.push(root);
+
+    const absoluteProjectRoot = join(workspaceRoot, tempProjectRoot);
+    const remoteConfigPath = join(absoluteProjectRoot, 'openapi-ts.config.ts');
+    writeFileSync(
+      remoteConfigPath,
+      `export default {
+  input: { path: 'https://example.com/api/openapi.yaml' },
+  output: { path: 'src/generated' },
+  plugins: ['@hey-api/client-fetch'],
+}`,
+    );
+    const configFile = `${tempProjectRoot}/openapi-ts.config.ts`;
+
+    const [, createNodes] = createNodesV2;
+    const result = await createNodes([configFile], {}, getCreateNodesContext());
+    const [, createNodesResult] = result[0];
+    const updateApiTarget =
+      createNodesResult.projects?.[tempProjectRoot]?.targets?.updateApi;
+
+    const runtimeInput = updateApiTarget?.inputs?.find(
+      (i: any) => typeof i === 'object' && 'runtime' in i,
+    ) as { runtime: string } | undefined;
+
+    expect(runtimeInput).toBeDefined();
+    expect(runtimeInput?.runtime).toContain('xcurl');
+    expect(runtimeInput?.runtime).not.toContain('npx');
+  });
 
   it('should honor custom buildTargetName for inferred updateApi dependsOn', async () => {
     const { configFile, tempProjectRoot } = writeConfigFixture('ts');
