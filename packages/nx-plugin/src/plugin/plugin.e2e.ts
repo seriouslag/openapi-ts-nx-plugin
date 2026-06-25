@@ -1,4 +1,4 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -118,6 +118,55 @@ describe('plugin inferred e2e', () => {
       );
     },
   );
+
+  it('generateApi target runs the openapi-ts binary and produces generated files', () => {
+    const root = writeWorkspace({ extension: 'cjs' });
+    tempRoots.push(root);
+
+    // Write the spec file the config references (input: './api/spec.yaml')
+    const specDir = join(root, 'packages/sample/api');
+    mkdirSync(specDir, { recursive: true });
+    writeFileSync(
+      join(specDir, 'spec.yaml'),
+      [
+        'openapi: "3.0.0"',
+        'info:',
+        '  title: E2E Binary Test API',
+        '  version: "1.0.0"',
+        'paths:',
+        '  /items:',
+        '    get:',
+        '      operationId: listItems',
+        '      responses:',
+        '        "200":',
+        '          description: OK',
+      ].join('\n'),
+    );
+
+    // Run the inferred generateApi target. The temp workspace has no
+    // node_modules, so we extend PATH to include the monorepo's bin dirs —
+    // matching what a real user project looks like after `npm install`.
+    // NX_DAEMON=false prevents daemon startup overhead in test environments.
+    execFileSync('node', [nxBin, 'run', '@tmp/inferred-e2e:generateApi'], {
+      cwd: root,
+      encoding: 'utf-8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+      env: {
+        ...process.env,
+        NX_DAEMON: 'false',
+        PATH: [
+          join(workspaceRoot, 'node_modules/.bin'),
+          join(workspaceRoot, 'packages/nx-plugin/node_modules/.bin'),
+          process.env.PATH ?? '',
+        ].join(':'),
+      },
+    });
+
+    const generatedDir = join(root, 'packages/sample/src/generated');
+    expect(existsSync(join(generatedDir, 'index.ts'))).toBe(true);
+    expect(existsSync(join(generatedDir, 'types.gen.ts'))).toBe(true);
+    expect(existsSync(join(generatedDir, 'sdk.gen.ts'))).toBe(true);
+  });
 
   it('applies custom inferred target names from plugin options', () => {
     const root = writeWorkspace({
