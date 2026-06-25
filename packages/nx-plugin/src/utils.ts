@@ -41,7 +41,7 @@ export function generateClientCommand({
   plugins: Plugin[];
   specFile: string;
 }) {
-  return `npx @hey-api/openapi-ts -i ${specFile} -o ${outputPath} -c ${clientType}${plugins.length > 0 ? ` ${plugins.map((plugin) => `-p ${getPluginName(plugin)}`).join(' ')}` : ''}`;
+  return `openapi-ts -i ${specFile} -o ${outputPath} -c ${clientType}${plugins.length > 0 ? ` ${plugins.map((plugin) => `-p ${getPluginName(plugin)}`).join(' ')}` : ''}`;
 }
 
 /**

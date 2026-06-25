@@ -266,7 +266,7 @@ function createOpenApiTargets(
   } else {
     // For remote specs, add a runtime hash check
     const apiHash = {
-      runtime: `npx node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex'))" "$(npx -y xcurl -s ${input})"`,
+      runtime: `node -e "console.log(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex'))" "$(xcurl -s ${input})"`,
     };
     updateInputs.push(apiHash);
   }
@@ -278,7 +278,7 @@ function createOpenApiTargets(
     executor: 'nx:run-commands',
     inputs: baseInputs,
     options: {
-      command: `npx @hey-api/openapi-ts`,
+      command: `openapi-ts`,
       cwd: '{projectRoot}',
     },
     outputs: [`{projectRoot}/${output}`],
