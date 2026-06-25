@@ -1,0 +1,80 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies"],
+  "ignoreDeps": ["@hey-api/openapi-ts"],
+  "packageRules": [
+    {
+      "description": "Nx ecosystem — group all @nx/* and nx into one PR",
+      "matchPackageNames": ["nx", "@nx/*"],
+      "groupName": "Nx ecosystem",
+      "groupSlug": "nx-ecosystem",
+      "automerge": false
+    },
+    {
+      "description": "SWC toolchain",
+      "matchPackageNames": ["@swc-node/*", "@swc/*"],
+      "groupName": "SWC toolchain",
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Vitest and coverage tooling",
+      "matchPackageNames": ["vitest", "@vitest/*"],
+      "groupName": "Vitest",
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "TypeScript — major bumps need manual review against nx/rollup compat",
+      "matchPackageNames": ["typescript", "typescript-eslint"],
+      "groupName": "TypeScript toolchain",
+      "automerge": false
+    },
+    {
+      "description": "ESLint ecosystem",
+      "matchPackageNames": ["eslint", "@eslint/*", "globals"],
+      "groupName": "ESLint",
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    },
+    {
+      "description": "Build tooling — rollup, vite, tsup",
+      "matchPackageNames": ["rollup", "vite", "tsup"],
+      "groupName": "Build tooling",
+      "automerge": false
+    },
+    {
+      "description": "Runtime deps that affect published package — no automerge",
+      "matchPackageNames": [
+        "@hey-api/json-schema-ref-parser",
+        "api-smart-diff",
+        "swagger2openapi",
+        "@types/swagger2openapi",
+        "latest-version",
+        "xcurl",
+        "tslib"
+      ],
+      "groupName": "Runtime dependencies",
+      "automerge": false
+    },
+    {
+      "description": "Automerge minor/patch for low-risk dev deps",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch"],
+      "matchPackageNames": [
+        "prettier",
+        "lefthook",
+        "jsdom",
+        "ts-node",
+        "@types/node"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "minimumReleaseAge": "3 days"
+    }
+  ]
+}
