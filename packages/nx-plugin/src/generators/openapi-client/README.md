@@ -14,17 +14,24 @@ nx generate @seriouslag/nx-openapi-ts-plugin:openapi-client
 
 ## Options
 
-| Option      | Description                                       | Required | Default                 | Type                        |
-| ----------- | ------------------------------------------------- | -------- | ----------------------- | --------------------------- |
-| `name`      | Library name                                      | Yes      | -                       | string                      |
-| `scope`     | Scope of the project                              | Yes      | -                       | string                      |
-| `spec`      | Path to the OpenAPI spec file (URL or local path) | Yes      | -                       | string                      |
-| `client`    | Type of client to generate                        | No       | `@hey-api/client-fetch` | string                      |
-| `directory` | Directory where the library will be created       | No       | `libs`                  | string                      |
-| `tags`      | Add tags to the library (comma-separated)         | No       | `api,openapi`           | string[]                    |
-| `plugins`   | Additional plugins for client                     | No       | []                      | string[]                    |
-| `test`      | Tests to generate                                 | No       | `none`                  | 'none', 'vitest', or 'jest' |
-| `private`   | Whether to make the generated package private     | No       | `true`                  | boolean                     |
+| Option              | Description                                                                                                                                                                                                | Required | Default                 | Type                        |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------- | ----------------------- | --------------------------- |
+| `name`              | Library name                                                                                                                                                                                               | Yes      | -                       | string                      |
+| `scope`             | Scope of the project (e.g. `@my-org`)                                                                                                                                                                      | Yes      | -                       | string                      |
+| `spec`              | Path to the OpenAPI spec file (URL or local path). Swagger 2.0 and OpenAPI 3.x supported.                                                                                                                  | Yes      | -                       | string                      |
+| `client`            | Type of client to generate                                                                                                                                                                                 | No       | `@hey-api/client-fetch` | string                      |
+| `directory`         | Directory where the library will be created                                                                                                                                                                | No       | `libs`                  | string                      |
+| `tags`              | Add tags to the library (comma-separated)                                                                                                                                                                  | No       | `api,openapi`           | string[]                    |
+| `plugins`           | Additional `@hey-api/openapi-ts` plugins to enable (e.g. `@hey-api/schemas`, `@tanstack/react-query`, `zod`)                                                                                               | No       | `[]`                    | string[]                    |
+| `test`              | Test runner to scaffold                                                                                                                                                                                    | No       | `none`                  | `none`, `vitest`, or `jest` |
+| `private`           | Whether to make the generated package private                                                                                                                                                              | No       | `true`                  | boolean                     |
+| `useInferredTasks`  | Use Nx inferred tasks instead of explicit targets. When `true`, the generator creates minimal project config and relies on the Nx plugin to infer targets from `openapi-ts.config.*`                       | No       | `true`                  | boolean                     |
+| `projectReferences` | Add TypeScript project references to the generated project                                                                                                                                                 | No       | `true`                  | boolean                     |
+| `baseTsConfigName`  | Name of the base tsconfig file that contains compiler paths (e.g. `tsconfig.base.json`). Use when the base tsconfig is at the workspace root. Cannot be used together with a file-path `baseTsConfigPath`. | No       | -                       | string                      |
+| `baseTsConfigPath`  | Path to the base tsconfig file or directory. If a directory and `baseTsConfigName` is set, the name is appended. If a file path, do not also set `baseTsConfigName`.                                       | No       | -                       | string                      |
+| `serveCmdName`      | Name of the Nx target used to serve implicit dependencies while watching for changes                                                                                                                       | No       | `serve`                 | string                      |
+
+> **Note:** `asClass` appears in the schema but is not yet functional.
 
 ## Examples
 

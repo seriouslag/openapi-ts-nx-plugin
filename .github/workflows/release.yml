@@ -123,6 +123,16 @@ jobs:
 
           echo "skip_existing_tag=false" >> $GITHUB_OUTPUT
 
+      - name: Generate changelog entry
+        if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
+        uses: orhun/git-cliff-action@v4
+        with:
+          config: cliff.toml
+          args: --tag ${{ steps.tag.outputs.tag }} --unreleased --prepend CHANGELOG.md
+        env:
+          OUTPUT: CHANGELOG.md
+          GITHUB_REPO: ${{ github.repository }}
+
       - name: Create release artifacts and push
         if: ${{ steps.strategy.outputs.should_release == 'true' && steps.tag.outputs.skip_existing_tag != 'true' }}
         shell: bash
@@ -131,16 +141,23 @@ jobs:
 
           TAG="${{ steps.tag.outputs.tag }}"
 
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           if git diff --quiet -- packages/nx-plugin/package.json; then
-            echo "No version change detected in packages/nx-plugin/package.json. Tagging current HEAD."
+            echo "No version change detected in packages/nx-plugin/package.json. Committing changelog only."
+            git add CHANGELOG.md
+            if git diff --quiet --cached; then
+              echo "No staged changes. Tagging current HEAD without commit."
+            else
+              git commit -m "chore(release): ${TAG}"
+            fi
             git tag "${TAG}"
-            git push origin "${TAG}"
+            git push origin HEAD:main "${TAG}"
             exit 0
           fi
 
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add packages/nx-plugin/package.json
+          git add packages/nx-plugin/package.json CHANGELOG.md
           git commit -m "chore(release): ${TAG}"
           git tag "${TAG}"
           git push origin HEAD:main "${TAG}"

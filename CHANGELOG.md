@@ -1,3 +1,5 @@
+<!-- Changelog is auto-generated from v0.99.3 onwards via git-cliff. For history prior to that, see the git log. -->
+
 ## 0.0.3 (2025-04-15)
 
 ### 🚀 Features
