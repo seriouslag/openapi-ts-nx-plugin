@@ -2,6 +2,7 @@
   "name": "@seriouslag/source",
   "version": "0.0.0",
   "license": "MIT",
+  "packageManager": "pnpm@11.5.2",
   "scripts": {
     "build": "nx run-many --target=build",
     "typecheck": "nx run-many --target=typecheck",

@@ -6,5 +6,6 @@ onlyBuiltDependencies:
   - '@swc/core'
   - '@tailwindcss/oxide'
   - esbuild
+  - lefthook
   - nx
   - unrs-resolver
