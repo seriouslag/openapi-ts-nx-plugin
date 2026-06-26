@@ -303,13 +303,13 @@ const HTTP_METHODS = new Set([
  * schema property that merely happens to be named "tags".
  */
 export function isOperationTagsPath(path: (string | number)[]): boolean {
-  const tagsIndex = path.indexOf('tags');
-  if (tagsIndex < 2) {
-    return false;
-  }
-  const method = path[tagsIndex - 1];
+  // OpenAPI operation tags live at exactly `paths.<route>.<method>.tags[.<i>]`.
+  // Match that fixed position only — using indexOf would also match `tags`
+  // nested deeper (e.g. under a callback operation), which we must not ignore.
+  const method = path[2];
   return (
     path[0] === 'paths' &&
+    path[3] === 'tags' &&
     typeof method === 'string' &&
     HTTP_METHODS.has(method.toLowerCase())
   );
@@ -422,6 +422,10 @@ export async function atomicReplaceDir(
   const suffix = randomUUID();
   const stagingDir = `${targetDir}.staging-${suffix}`;
   const backupDir = `${targetDir}.old-${suffix}`;
+  // Only delete the backup once the target is safely in place — either the new
+  // dir swapped in, or the original was restored. If both the swap-in and the
+  // restore fail, the backup is the sole intact copy and must be preserved.
+  let backupSafeToDelete = false;
 
   // Stage the new contents on the same filesystem as the target so the
   // subsequent renames are atomic.
@@ -434,10 +438,12 @@ export async function atomicReplaceDir(
     }
     try {
       await rename(stagingDir, targetDir);
+      backupSafeToDelete = true;
     } catch (error) {
       // Swap-in failed: restore the original directory before rethrowing.
       if (targetExists && !existsSync(targetDir)) {
         await rename(backupDir, targetDir);
+        backupSafeToDelete = true;
       }
       throw error;
     }
@@ -445,7 +451,9 @@ export async function atomicReplaceDir(
     await rm(stagingDir, { force: true, recursive: true });
     throw error;
   } finally {
-    await rm(backupDir, { force: true, recursive: true });
+    if (backupSafeToDelete) {
+      await rm(backupDir, { force: true, recursive: true });
+    }
   }
 }
 

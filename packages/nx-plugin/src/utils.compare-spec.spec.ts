@@ -250,4 +250,21 @@ describe('isOperationTagsPath', () => {
   it('does NOT match the top-level tags definition', () => {
     expect(isOperationTagsPath(['tags', 0, 'name'])).toBe(false);
   });
+
+  it('does NOT match tags nested deeper than the operation level', () => {
+    // e.g. a tags array on a callback operation nested under the parent op.
+    expect(
+      isOperationTagsPath([
+        'paths',
+        '/users',
+        'post',
+        'callbacks',
+        'onEvent',
+        '{$request.body#/url}',
+        'post',
+        'tags',
+        0,
+      ]),
+    ).toBe(false);
+  });
 });
