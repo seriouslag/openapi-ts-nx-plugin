@@ -1,7 +1,7 @@
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
-import { compareSpecs } from './utils';
+import { compareSpecs, isOperationTagsPath } from './utils';
 
 describe('compareSpecs', () => {
   describe('JSON Specs', () => {
@@ -49,6 +49,14 @@ describe('compareSpecs', () => {
       const areEqual = await compareSpecs(
         resolve(__dirname, './test-specs/base.json'),
         resolve(__dirname, './test-specs/example-changed.json'),
+      );
+      expect(areEqual).toBe(true);
+    });
+
+    it('should ignore operation tags changes', async () => {
+      const areEqual = await compareSpecs(
+        resolve(__dirname, './test-specs/base.json'),
+        resolve(__dirname, './test-specs/tags-changed.json'),
       );
       expect(areEqual).toBe(true);
     });
@@ -202,5 +210,44 @@ describe('compareSpecs', () => {
       );
       expect(areEqual).toBe(false);
     });
+  });
+});
+
+describe('isOperationTagsPath', () => {
+  it('matches an operation tags array entry', () => {
+    expect(isOperationTagsPath(['paths', '/users', 'get', 'tags', 0])).toBe(
+      true,
+    );
+  });
+
+  it('matches the operation tags array itself', () => {
+    expect(isOperationTagsPath(['paths', '/users', 'post', 'tags'])).toBe(true);
+  });
+
+  it('is case-insensitive about the HTTP method', () => {
+    expect(isOperationTagsPath(['paths', '/users', 'GET', 'tags', 1])).toBe(
+      true,
+    );
+  });
+
+  it('does NOT match a schema property named "tags"', () => {
+    expect(
+      isOperationTagsPath([
+        'components',
+        'schemas',
+        'User',
+        'properties',
+        'tags',
+      ]),
+    ).toBe(false);
+  });
+
+  it('does NOT match tags not preceded by an HTTP method', () => {
+    expect(isOperationTagsPath(['paths', '/users', 'tags'])).toBe(false);
+    expect(isOperationTagsPath(['tags'])).toBe(false);
+  });
+
+  it('does NOT match the top-level tags definition', () => {
+    expect(isOperationTagsPath(['tags', 0, 'name'])).toBe(false);
   });
 });
