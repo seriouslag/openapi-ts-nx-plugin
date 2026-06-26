@@ -9,6 +9,16 @@ Under the hood it uses [@hey-api/openapi-ts](https://github.com/hey-api/openapi-
 
 This plugin helps generate packages to be linked correctly in the NX environment and to provide executors to update the client code when an change in the spec file is detected.
 
+## Prerequisites
+
+This repo is pinned to **pnpm 11** via the `packageManager` field in `package.json`. Use [Corepack](https://nodejs.org/api/corepack.html) so your local pnpm matches the pinned version (and CI):
+
+```bash
+corepack enable
+```
+
+Corepack ships with Node and will automatically run the pinned pnpm version inside this repo. Running an older pnpm (e.g. pnpm 9) here will not honour the `allowBuilds` setting and installs may fail with `ERR_PNPM_IGNORED_BUILDS`.
+
 ## install dependencies
 
 ```bash

@@ -95,7 +95,6 @@ jobs:
         if: ${{ steps.gate.outputs.authorized == 'true' }}
         name: Install pnpm
         with:
-          version: 9
           run_install: false
 
       - name: Get pnpm store directory
