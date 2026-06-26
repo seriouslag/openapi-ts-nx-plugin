@@ -1,9 +1,10 @@
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
+import type { UpdateApiExecutorSchema } from './schema';
 import runExecutor from './updateApi';
 
 // Two semantically distinct OpenAPI 3.0 specs used to exercise change detection.
@@ -59,7 +60,7 @@ describe('updateApi executor e2e', () => {
     writeFileSync(join(getProjectRoot(), 'api', 'spec.yaml'), spec);
   }
 
-  function baseOptions(specPath: string) {
+  function baseOptions(specPath: string): UpdateApiExecutorSchema {
     return {
       client: '@hey-api/client-fetch',
       directory,
@@ -90,10 +91,11 @@ describe('updateApi executor e2e', () => {
 
       process.chdir(tempRoot);
 
-      const result = await runExecutor(baseOptions(newSpecPath) as any, {} as any);
+      const result = await runExecutor(baseOptions(newSpecPath), {} as any);
 
       expect(result.success).toBe(true);
       expect(existsSync(getGeneratedDir())).toBe(true);
+      expect(existsSync(join(getGeneratedDir(), 'index.ts'))).toBe(true);
       expect(existsSync(join(getGeneratedDir(), 'types.gen.ts'))).toBe(true);
       expect(existsSync(join(getGeneratedDir(), 'sdk.gen.ts'))).toBe(true);
     },
@@ -109,7 +111,7 @@ describe('updateApi executor e2e', () => {
 
       process.chdir(tempRoot);
 
-      const result = await runExecutor(baseOptions(sameSpecPath) as any, {} as any);
+      const result = await runExecutor(baseOptions(sameSpecPath), {} as any);
 
       expect(result.success).toBe(true);
       // Nothing generated — specs were semantically identical.
@@ -128,7 +130,7 @@ describe('updateApi executor e2e', () => {
       process.chdir(tempRoot);
 
       const result = await runExecutor(
-        { ...baseOptions(sameSpecPath), force: true } as any,
+        { ...baseOptions(sameSpecPath), force: true },
         {} as any,
       );
 
@@ -149,13 +151,17 @@ describe('updateApi executor e2e', () => {
       process.chdir(tempRoot);
 
       // First run: V1 existing → V2 incoming, generates files and writes V2 to project.
-      const firstResult = await runExecutor(baseOptions(v2SpecPath) as any, {} as any);
+      const firstResult = await runExecutor(baseOptions(v2SpecPath), {} as any);
       expect(firstResult.success).toBe(true);
       expect(existsSync(getGeneratedDir())).toBe(true);
 
+      const mtimeBefore = statSync(getGeneratedDir()).mtimeMs;
+
       // Second run: project spec is now V2, incoming is still V2 → equal → skip.
-      const secondResult = await runExecutor(baseOptions(v2SpecPath) as any, {} as any);
+      const secondResult = await runExecutor(baseOptions(v2SpecPath), {} as any);
       expect(secondResult.success).toBe(true);
+      // Generated dir must not have been touched — mtime unchanged proves the skip.
+      expect(statSync(getGeneratedDir()).mtimeMs).toBe(mtimeBefore);
     },
   );
 });
