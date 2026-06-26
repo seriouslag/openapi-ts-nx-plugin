@@ -128,9 +128,12 @@ jobs:
         uses: orhun/git-cliff-action@v4
         with:
           config: cliff.toml
+          # `--prepend` writes the new entry into CHANGELOG.md in place. Do NOT
+          # also set the OUTPUT env (git-cliff's -o): newer git-cliff rejects
+          # -o and -p pointing at the same file ("'-o' and '-p' can only be
+          # used together if they point to different files").
           args: --tag ${{ steps.tag.outputs.tag }} --unreleased --prepend CHANGELOG.md
         env:
-          OUTPUT: CHANGELOG.md
           GITHUB_REPO: ${{ github.repository }}
 
       - name: Create release artifacts and push
