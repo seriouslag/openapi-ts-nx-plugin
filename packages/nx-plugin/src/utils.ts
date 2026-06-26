@@ -1,12 +1,15 @@
 import { existsSync, lstatSync } from 'node:fs';
 import {
+  cp,
   mkdir,
   readdir,
   readFile,
+  rename,
   rm,
   rmdir,
   writeFile,
 } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import {
   basename,
   dirname,
@@ -281,6 +284,37 @@ export function removeExamples(spec: JSONSchema) {
   return spec;
 }
 
+const HTTP_METHODS = new Set([
+  'connect',
+  'delete',
+  'get',
+  'head',
+  'options',
+  'patch',
+  'post',
+  'put',
+  'trace',
+]);
+
+/**
+ * True when a diff path points at an operation's `tags` array, i.e.
+ * `paths.<route>.<method>.tags[.<index>]`. Used to ignore tag-only changes,
+ * which do not affect generated client code. Deliberately does NOT match a
+ * schema property that merely happens to be named "tags".
+ */
+export function isOperationTagsPath(path: (string | number)[]): boolean {
+  // OpenAPI operation tags live at exactly `paths.<route>.<method>.tags[.<i>]`.
+  // Match that fixed position only — using indexOf would also match `tags`
+  // nested deeper (e.g. under a callback operation), which we must not ignore.
+  const method = path[2];
+  return (
+    path[0] === 'paths' &&
+    path[3] === 'tags' &&
+    typeof method === 'string' &&
+    HTTP_METHODS.has(method.toLowerCase())
+  );
+}
+
 /**
  * Fetches two spec files and compares them for differences
  */
@@ -312,9 +346,32 @@ export async function compareSpecs(
     if (diff.path.includes('examples') || diff.path.includes('example')) {
       return false;
     }
+    // Operation-level `tags` are organizational metadata only — they are not
+    // emitted into the generated client by openapi-ts, so a tags-only delta
+    // must not count as a spec change. Otherwise the client is needlessly
+    // regenerated on every run (which churns the generated directory).
+    //
+    // Match ONLY `paths.<route>.<method>.tags[...]` — not a schema property
+    // that merely happens to be named "tags", and not `summary`/`description`
+    // (those ARE emitted as JSDoc on the generated SDK, so they affect output).
+    if (isOperationTagsPath(diff.path)) {
+      return false;
+    }
     return true;
   });
   const areSpecsEqual = filteredDiffs.length === 0;
+
+  if (!areSpecsEqual) {
+    logger.debug(
+      `Found ${filteredDiffs.length} significant diff(s): ${JSON.stringify(
+        filteredDiffs.map((diff) => ({
+          action: diff.action,
+          path: Array.isArray(diff.path) ? diff.path.join('.') : diff.path,
+          type: diff.type,
+        })),
+      )}`,
+    );
+  }
 
   logger.debug(`Are specs equal: ${areSpecsEqual}`);
   return areSpecsEqual;
@@ -344,6 +401,60 @@ export function isAFile(isFileSystemFile: string) {
  */
 export async function makeDir(path: string) {
   await mkdir(path, { recursive: true });
+}
+
+/**
+ * Atomically replaces `targetDir` with the contents of `sourceDir`.
+ *
+ * The naive approach (rm -rf targetDir; cp sourceDir targetDir) leaves
+ * `targetDir` absent or half-populated for the duration of the copy. When the
+ * target is consumed by a concurrent task (e.g. `tsc --build` reading committed
+ * generated sources), that window causes spurious "cannot find module" errors.
+ *
+ * Instead we stage the new contents next to the target and swap directories with
+ * `rename`, which is atomic within a filesystem. On any failure the original
+ * `targetDir` is left untouched.
+ */
+export async function atomicReplaceDir(
+  sourceDir: string,
+  targetDir: string,
+): Promise<void> {
+  const suffix = randomUUID();
+  const stagingDir = `${targetDir}.staging-${suffix}`;
+  const backupDir = `${targetDir}.old-${suffix}`;
+  // Only delete the backup once the target is safely in place — either the new
+  // dir swapped in, or the original was restored. If both the swap-in and the
+  // restore fail, the backup is the sole intact copy and must be preserved.
+  let backupSafeToDelete = false;
+
+  // Stage the new contents on the same filesystem as the target so the
+  // subsequent renames are atomic.
+  await cp(sourceDir, stagingDir, { recursive: true });
+
+  try {
+    const targetExists = existsSync(targetDir);
+    if (targetExists) {
+      await rename(targetDir, backupDir);
+    }
+    try {
+      await rename(stagingDir, targetDir);
+      backupSafeToDelete = true;
+    } catch (error) {
+      // Swap-in failed: restore the original directory before rethrowing.
+      if (targetExists && !existsSync(targetDir)) {
+        await rename(backupDir, targetDir);
+        backupSafeToDelete = true;
+      }
+      throw error;
+    }
+  } catch (error) {
+    await rm(stagingDir, { force: true, recursive: true });
+    throw error;
+  } finally {
+    if (backupSafeToDelete) {
+      await rm(backupDir, { force: true, recursive: true });
+    }
+  }
 }
 
 /**

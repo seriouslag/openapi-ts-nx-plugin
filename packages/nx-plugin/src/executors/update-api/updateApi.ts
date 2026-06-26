@@ -1,17 +1,12 @@
 import { existsSync, writeFileSync } from 'node:fs';
-import {
-  cp,
-  readFile,
-  rm,
-  watch as fileWatch,
-  writeFile,
-} from 'node:fs/promises';
+import { readFile, watch as fileWatch, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import type { PromiseExecutor } from '@nx/devkit';
 import { logger, names } from '@nx/devkit';
 
 import {
+  atomicReplaceDir,
   bundleAndDereferenceSpecFile,
   cleanupTempFolder,
   compareSpecs,
@@ -274,27 +269,23 @@ const runExecutor: PromiseExecutor<UpdateApiExecutorSchema> = async (
       projectGeneratedDir,
     );
 
-    // Remove old generated directory if it exists
-    if (existsSync(absoluteProjectGeneratedDir)) {
-      logger.debug(
-        `Removing old generated directory: ${absoluteProjectGeneratedDir}`,
-      );
-      await rm(absoluteProjectGeneratedDir, {
-        force: true,
-        recursive: true,
-      });
-      logger.debug(
-        `Old generated directory removed successfully: ${absoluteProjectGeneratedDir}`,
-      );
-    }
-
-    // Copy new generated directory
-    await cp(absoluteGeneratedTempDir, absoluteProjectGeneratedDir, {
-      recursive: true,
-    });
-
+    // Format the freshly generated files in the temp directory *before* swapping
+    // them into place, so the project's generated directory is only ever
+    // replaced with fully-formed, formatted output.
     logger.debug('Formatting generated directory...');
-    await formatFiles(absoluteProjectGeneratedDir);
+    await formatFiles(absoluteGeneratedTempDir);
+
+    // Atomically swap the new generated directory into place. This avoids the
+    // window where the project's generated directory would otherwise be absent
+    // or half-populated (which breaks concurrent `tsc --build` consumers).
+    logger.debug(
+      `Atomically replacing generated directory: ${absoluteProjectGeneratedDir}`,
+    );
+    await atomicReplaceDir(
+      absoluteGeneratedTempDir,
+      absoluteProjectGeneratedDir,
+    );
+    logger.debug(`Generated directory replaced successfully`);
 
     logger.info('Successfully updated API client and spec files.');
     await cleanup(absoluteTempFolder);
