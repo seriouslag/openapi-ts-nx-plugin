@@ -208,6 +208,46 @@ describe('openapi-client generator', () => {
       ).toBeTruthy();
     });
 
+    it('should generate vitest test target and files when requested', async () => {
+      const { options, tree } = await getGeneratorOptions({
+        name: `test-api-${randomUUID()}`,
+        tempDirectory,
+      });
+      const normalizedOptions = normalizeOptions({
+        ...options,
+        test: 'vitest',
+        useInferredTasks: false,
+      });
+
+      await generateNxProject({ clientPlugins: {}, normalizedOptions, tree });
+
+      const config = readJson(
+        tree,
+        `${normalizedOptions.projectRoot}/project.json`,
+      );
+      expect(config.targets.test).toBeDefined();
+      expect(config.targets.test.options.command).toBe(
+        'vitest run --config ./vite.config.mts',
+      );
+
+      expect(
+        tree.exists(`${normalizedOptions.projectRoot}/vite.config.mts`),
+      ).toBeTruthy();
+      expect(
+        tree.exists(`${normalizedOptions.projectRoot}/tsconfig.spec.json`),
+      ).toBeTruthy();
+      expect(
+        tree.exists(`${normalizedOptions.projectRoot}/src/client.spec.ts`),
+      ).toBeTruthy();
+
+      const packageJson = readJson(
+        tree,
+        `${normalizedOptions.projectRoot}/package.json`,
+      );
+      expect(packageJson.devDependencies.vitest).toBeDefined();
+      expect(packageJson.devDependencies.vite).toBeDefined();
+    });
+
     it('should generate jest test target and files when requested', async () => {
       const { options, tree } = await getGeneratorOptions({
         name: `test-api-${randomUUID()}`,
@@ -488,6 +528,44 @@ describe('openapi-client generator', () => {
       expect(tree.exists(`${projectRoot}/package.json`)).toBeTruthy();
       expect(tree.exists(`${projectRoot}/tsconfig.json`)).toBeTruthy();
       expect(tree.exists(`${projectRoot}/api/spec.yaml`)).toBeTruthy();
+    });
+
+    it('should generate @hey-api/schemas plugin template when plugin is specified', async () => {
+      const { options, tree } = await getGeneratorOptions({
+        name: `test-api-${randomUUID()}`,
+        tempDirectory,
+      });
+      await generator(tree, {
+        ...options,
+        plugins: ['@hey-api/schemas'],
+      });
+
+      const normalizedOptions = normalizeOptions({
+        ...options,
+        plugins: ['@hey-api/schemas'],
+      });
+      const { projectRoot } = normalizedOptions;
+
+      expect(tree.exists(`${projectRoot}/src/schemas.ts`)).toBeTruthy();
+    });
+
+    it('should generate @tanstack/react-query plugin template when plugin is specified', async () => {
+      const { options, tree } = await getGeneratorOptions({
+        name: `test-api-${randomUUID()}`,
+        tempDirectory,
+      });
+      await generator(tree, {
+        ...options,
+        plugins: ['@tanstack/react-query'],
+      });
+
+      const normalizedOptions = normalizeOptions({
+        ...options,
+        plugins: ['@tanstack/react-query'],
+      });
+      const { projectRoot } = normalizedOptions;
+
+      expect(tree.exists(`${projectRoot}/src/rq.ts`)).toBeTruthy();
     });
   });
 });
