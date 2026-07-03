@@ -1,0 +1,119 @@
+name: Repository Stats
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 12 * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  update-repo-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Generate and publish repository stats
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const timeZone = 'America/Indiana/Indianapolis';
+            const issueTitle = 'Repository Stats';
+
+            const getParts = (date) => {
+              const parts = new Intl.DateTimeFormat('en-US', {
+                day: '2-digit',
+                month: '2-digit',
+                timeZone,
+                year: 'numeric',
+              }).formatToParts(date);
+
+              return Object.fromEntries(parts.map((part) => [part.type, part.value]));
+            };
+
+            const getLocalDateKey = (date) => {
+              const parts = getParts(date);
+              return `${parts.year}-${parts.month}-${parts.day}`;
+            };
+
+            const now = new Date();
+            const todayParts = getParts(now);
+            const todayUtcMidnight = new Date(
+              `${todayParts.year}-${todayParts.month}-${todayParts.day}T00:00:00Z`,
+            );
+            const previousDayUtcMidnight = new Date(
+              todayUtcMidnight.getTime() - 24 * 60 * 60 * 1000,
+            );
+            const previousDayKey = getLocalDateKey(previousDayUtcMidnight);
+
+            const repository = await github.rest.repos.get({ owner, repo });
+            const stargazers = [];
+
+            for await (const response of github.paginate.iterator(
+              github.rest.activity.listStargazersForRepo,
+              {
+                headers: { accept: 'application/vnd.github.star+json' },
+                owner,
+                per_page: 100,
+                repo,
+              },
+            )) {
+              stargazers.push(...response.data);
+            }
+
+            const newStargazersPreviousDay = stargazers
+              .filter((stargazer) => {
+                const starredAt = stargazer.starred_at;
+                return starredAt && getLocalDateKey(new Date(starredAt)) === previousDayKey;
+              })
+              .map((stargazer) => ({
+                htmlUrl: stargazer.user?.html_url ?? null,
+                login: stargazer.user?.login ?? null,
+                starredAt: stargazer.starred_at,
+              }));
+
+            const stats = {
+              generatedAt: now.toISOString(),
+              repositories: [
+                {
+                  fullName: `${owner}/${repo}`,
+                  newStargazersPreviousDay,
+                  newStarsPreviousDay: newStargazersPreviousDay.length,
+                  stars: repository.data.stargazers_count,
+                },
+              ],
+              window: {
+                previousDay: previousDayKey,
+                timezone: timeZone,
+              },
+            };
+
+            const body = `# Repository Stats\n\n\`\`\`json\n${JSON.stringify(stats, null, 2)}\n\`\`\`\n`;
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              per_page: 100,
+              repo,
+              state: 'open',
+            });
+            const existingIssue = issues.find((issue) => {
+              return issue.title === issueTitle && !issue.pull_request;
+            });
+
+            if (existingIssue) {
+              await github.rest.issues.update({
+                body,
+                issue_number: existingIssue.number,
+                owner,
+                repo,
+              });
+            } else {
+              await github.rest.issues.create({
+                body,
+                owner,
+                repo,
+                title: issueTitle,
+              });
+            }
