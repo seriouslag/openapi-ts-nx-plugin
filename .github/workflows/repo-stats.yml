@@ -1,0 +1,45 @@
+name: Repository Stats
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 12 * * *'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  update-repo-stats:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate repository stats
+        run: node .github/scripts/update-repo-stats.mjs
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare issue body
+        run: |
+          {
+            echo '# Repository Stats'
+            echo
+            echo '```json'
+            cat .github/repo-stats.json
+            echo '```'
+          } > repo-stats-issue.md
+
+      - name: Publish issue
+        run: |
+          issue_number=$(gh issue list --label repo-stats --state open --json number,title --jq '.[] | select(.title == "Repository Stats") | .number' | head -n 1)
+
+          if [ -n "$issue_number" ]; then
+            gh issue edit "$issue_number" --body-file repo-stats-issue.md
+          else
+            gh issue create --title 'Repository Stats' --body-file repo-stats-issue.md
+          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
