@@ -36,7 +36,7 @@
     },
     "plugins": {
       "type": "array",
-      "description": "The plugins to be provided to @hey-api/openapi-ts",
+      "description": "The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { \"name\": \"...\", \"asClass\": true }",
       "default": [],
       "items": {
         "oneOf": [

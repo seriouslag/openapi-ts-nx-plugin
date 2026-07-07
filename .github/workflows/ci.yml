@@ -50,6 +50,9 @@ jobs:
       - name: Check nx-plugin version policy
         run: pnpm run version:check:nx-plugin
 
+      - name: Check README option tables match schemas
+        run: pnpm run docs:check:nx-plugin
+
       - name: Run lint
         run: pnpm run lint
 
