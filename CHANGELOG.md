@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.99.6 (2026-07-07)
+
+### 📚 Documentation
+
+- **nx-plugin:** Rewrite READMEs and add schema-to-markdown docs check (#32)([8caa09c](https://github.com/seriouslag/openapi-ts-nx-plugin/commit/8caa09c96f5091e8a898bf70f519a94cd93bd9cf))
+
+### 🔧 Miscellaneous
+
+- Add GitHub sponsors funding configuration([676f530](https://github.com/seriouslag/openapi-ts-nx-plugin/commit/676f5307679181622977708f5daf9d02a88577ab))
+
 ## 0.99.5 (2026-06-26)
 
 ### 🐛 Bug Fixes
