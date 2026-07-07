@@ -36,12 +36,12 @@ Then register the inferred-tasks plugin in your `nx.json`:
 
 ```bash
 # Generate a client library from a spec
-nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
   --scope=@my-org \
   --spec=https://petstore3.swagger.io/api/v3/openapi.json
 
 # Later: fetch the spec, diff it, and regenerate the client only if it changed
-nx run @my-org/my-api:updateApi
+npx nx run @my-org/my-api:updateApi
 ```
 
 ## Generators
@@ -51,13 +51,13 @@ nx run @my-org/my-api:updateApi
 Scaffolds a new API client library from an OpenAPI spec. Run without arguments for interactive prompts:
 
 ```bash
-nx g @seriouslag/nx-openapi-ts-plugin:openapi-client
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-client
 ```
 
 Or fully specified:
 
 ```bash
-nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
   --scope=@my-org \
   --directory=libs \
   --spec=./api/spec.yaml \
@@ -104,10 +104,10 @@ Use `openapi-client` instead when you need to scaffold a brand-new client librar
 
 ```bash
 # Interactive: prompts for the spec when --spec is not passed
-nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api
 
 # Non-interactive (CI-friendly)
-nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api --spec=./api/spec.yaml
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api --spec=./api/spec.yaml
 ```
 
 [Additional docs](./src/generators/openapi-config/README.md)
@@ -135,7 +135,7 @@ nx g @seriouslag/nx-openapi-ts-plugin:openapi-config --project=@my-org/my-api --
 Fetches the OpenAPI spec, compares it against the cached copy, and regenerates the client only if the API changed. Generated projects come pre-wired with this executor (or an inferred `updateApi` target), with options populated by the generator:
 
 ```bash
-nx run @my-org/my-api:updateApi
+npx nx run @my-org/my-api:updateApi
 ```
 
 #### Options

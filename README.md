@@ -33,12 +33,12 @@ Generate a client library and keep it up to date:
 
 ```bash
 # Scaffold a client library from a spec
-nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
   --scope=@my-org \
   --spec=https://petstore3.swagger.io/api/v3/openapi.json
 
 # Later: fetch the spec, diff it, and regenerate the client only if it changed
-nx run @my-org/my-api:updateApi
+npx nx run @my-org/my-api:updateApi
 ```
 
 📖 **[Full plugin documentation →](./packages/nx-plugin/README.md)** — generators, executors, inferred tasks, and all options.
