@@ -142,16 +142,16 @@ nx run @my-org/my-api:updateApi
 
 <!-- options:update-api:start -->
 
-| Option      | Type      | Default                 | Description                                                                                                                       |
-| ----------- | --------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `name`      | `string`  | _required_              | The name of the project.                                                                                                          |
-| `scope`     | `string`  | _required_              | The scope of the project.                                                                                                         |
-| `spec`      | `string`  | _required_              | Path to the OpenAPI spec file (URL or local path).                                                                                |
-| `directory` | `string`  | `libs`                  | Directory where the library will be created.                                                                                      |
-| `client`    | `string`  | `@hey-api/client-fetch` | The type of client to generate (@hey-api/client-fetch, @hey-api/client-axios, etc).                                               |
-| `plugins`   | `array`   | `[]`                    | The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { "name": "...", "asClass": true }.     |
-| `force`     | `boolean` | `false`                 | If true, the Client code will be regenerated even if the spec has not changed, also pass --skip-nx-cache to avoid caching issues. |
-| `watch`     | `boolean` | `false`                 | If true, the client will be watched for changes and regenerated when they occur.                                                  |
+| Option      | Type                   | Default                 | Description                                                                                                                       |
+| ----------- | ---------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `name`      | `string`               | _required_              | The name of the project.                                                                                                          |
+| `scope`     | `string`               | _required_              | The scope of the project.                                                                                                         |
+| `spec`      | `string`               | _required_              | Path to the OpenAPI spec file (URL or local path).                                                                                |
+| `directory` | `string`               | `libs`                  | Directory where the library will be created.                                                                                      |
+| `client`    | `string`               | `@hey-api/client-fetch` | The type of client to generate (@hey-api/client-fetch, @hey-api/client-axios, etc).                                               |
+| `plugins`   | `(string \| object)[]` | `[]`                    | The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { "name": "...", "asClass": true }.     |
+| `force`     | `boolean`              | `false`                 | If true, the Client code will be regenerated even if the spec has not changed, also pass --skip-nx-cache to avoid caching issues. |
+| `watch`     | `boolean`              | `false`                 | If true, the client will be watched for changes and regenerated when they occur.                                                  |
 
 <!-- options:update-api:end -->
 

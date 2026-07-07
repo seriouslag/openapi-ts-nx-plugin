@@ -35,7 +35,17 @@ const tables = [
 
 function renderType(property) {
   if (property.type === 'array') {
-    return property.items?.type ? `${property.items.type}[]` : 'array';
+    const items = property.items;
+    if (items?.type) {
+      return `${items.type}[]`;
+    }
+    if (Array.isArray(items?.oneOf)) {
+      const union = items.oneOf
+        .map((option) => option.type ?? 'object')
+        .join(' \\| ');
+      return `(${union})[]`;
+    }
+    return 'array';
   }
   return property.type ?? 'any';
 }
