@@ -1,15 +1,58 @@
-# @seriouslag/openapi-ts-nx-plugin
+# @seriouslag/nx-openapi-ts-plugin
 
 [![NPM Version](https://img.shields.io/npm/v/%40seriouslag%2Fnx-openapi-ts-plugin?link=https%3A%2F%2Fwww.npmjs.com%2Fpackage%2F%40seriouslag%2Fnx-openapi-ts-plugin)](https://www.npmjs.com/package/@seriouslag/nx-openapi-ts-plugin)
+[![CI](https://github.com/seriouslag/openapi-ts-nx-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/seriouslag/openapi-ts-nx-plugin/actions/workflows/ci.yml)
 
-This repo is to develop and test the [@seriouslag/nx-openapi-ts-plugin](https://www.npmjs.com/package/@seriouslag/nx-openapi-ts-plugin)
+An [Nx](https://nx.dev) plugin that generates TypeScript API client libraries from OpenAPI specs — powered by [`@hey-api/openapi-ts`](https://github.com/hey-api/openapi-ts) — and keeps them up to date as your API evolves.
 
-The package is a NX plugin that assits with the automation of generating NX projects to a workspace based off an OpenAPI spec file.
-Under the hood it uses [@hey-api/openapi-ts](https://github.com/hey-api/openapi-ts) to generate client code from the OpenAPI spec file.
+Point the generator at a spec (local file or URL) and it scaffolds a client library that is correctly wired into your Nx workspace: tags, TypeScript project references, and an implicit dependency on the project that produces the spec. From then on, a single cached Nx target regenerates the client only when the spec actually changes.
 
-This plugin helps generate packages to be linked correctly in the NX environment and to provide executors to update the client code when an change in the spec file is detected.
+## Why use it?
 
-## Prerequisites
+- **One command from spec to library** — scaffolds a buildable TypeScript client library with SDK functions, types, and your choice of HTTP client (`fetch`, `axios`, ...).
+- **Correct Nx graph wiring** — generated projects participate in the dependency graph, so the client regenerates after the spec-producing project builds.
+- **Cache-aware updates** — the `updateApi` target fetches the spec and diffs it against a cached copy; client code is only regenerated when the API actually changed, so Nx computation caching keeps CI fast.
+- **Inferred targets** — the plugin detects `openapi-ts.config.*` files and infers `generateApi`/`updateApi` targets automatically, no `project.json` boilerplate required.
+- **Version-aligned with `@hey-api/openapi-ts`** — the plugin's `major.minor` always matches the bundled openapi-ts version, so you always know which codegen you are getting.
+
+## Quick start
+
+```bash
+npm install -D @seriouslag/nx-openapi-ts-plugin
+```
+
+Register the inferred-tasks plugin in `nx.json` (required for the default generator setup):
+
+```json
+{
+  "plugins": ["@seriouslag/nx-openapi-ts-plugin/plugin"]
+}
+```
+
+Generate a client library and keep it up to date:
+
+```bash
+# Scaffold a client library from a spec
+npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-client my-api \
+  --scope=@my-org \
+  --spec=https://petstore3.swagger.io/api/v3/openapi.json
+
+# Later: fetch the spec, diff it, and regenerate the client only if it changed
+npx nx run @my-org/my-api:updateApi
+```
+
+📖 **[Full plugin documentation →](./packages/nx-plugin/README.md)** — generators, executors, inferred tasks, and all options.
+
+## Repository layout
+
+| Path                  | Contents                                                             |
+| --------------------- | -------------------------------------------------------------------- |
+| `packages/nx-plugin/` | The published plugin: `@seriouslag/nx-openapi-ts-plugin`             |
+| `apps/test-plugin/`   | React playground used to exercise the plugin locally (not published) |
+
+## Development
+
+### Prerequisites
 
 This repo is pinned to **pnpm 11** via the `packageManager` field in `package.json`. Use [Corepack](https://nodejs.org/api/corepack.html) so your local pnpm matches the pinned version (and CI):
 
@@ -19,123 +62,68 @@ corepack enable
 
 Corepack ships with Node and will automatically run the pinned pnpm version inside this repo. Running an older pnpm (e.g. pnpm 9) here will not honour the `allowBuilds` setting and installs may fail with `ERR_PNPM_IGNORED_BUILDS`.
 
-## install dependencies
+### Common tasks
 
 ```bash
-pnpm install
+pnpm install                                        # install dependencies
+pnpm run build                                      # build all projects
+pnpm run lint                                       # lint (auto-fix runs on pre-commit via lefthook)
+pnpm run typecheck                                  # typecheck
+pnpm run test                                       # unit tests
+pnpm nx run @seriouslag/nx-openapi-ts-plugin:e2e    # e2e tests (requires build output)
 ```
 
-## To run the plugin
+### Trying the plugin locally
 
 ```bash
-# run the generator to generate a package
-npx nx run @seriouslag/nx-openapi-ts-plugin:build && nx g @seriouslag/nx-openapi-ts-plugin:openapi-client pokemon-api --directory ./packages --scope @test-api --client @hey-api/client-fetch --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml --plugins @tanstack/react-query --private false --verbose
+# Build the plugin, then run the generator to create a package in this workspace
+npx nx run @seriouslag/nx-openapi-ts-plugin:build && \
+  npx nx g @seriouslag/nx-openapi-ts-plugin:openapi-client pokemon-api \
+    --directory ./packages \
+    --scope @test-api \
+    --client @hey-api/client-fetch \
+    --spec https://raw.githubusercontent.com/seriouslag/pokemon-api-spec/refs/heads/main/spec.yaml \
+    --plugins @tanstack/react-query \
+    --private false \
+    --verbose
 
-# Install will happen automatically after new package is generated
+# Install happens automatically after the new package is generated.
 
-# runs the executor to update the generated package
+# Run the executor to update the generated package
 npx nx run @test-api/pokemon-api:updateApi
-# There will be no update since the spec is the same
-# This result will be cached by nx, for a new result the API spec file must change or the `--skip-nx-cache --force` flags must be used
+# There will be no update since the spec is the same. Nx caches this result;
+# for a new result the spec must change, or use the flags below.
 
-# to test an update: Ether change the source spec file or make a change to one of the routes paths in the cached spec file located at ./packages/pokemon-api/src/spec.yaml
-# then run the executor again and you will see it recreate the client code
+# To test an update: either change the source spec, or edit one of the route paths
+# in the cached spec at ./packages/pokemon-api/src/spec.yaml — then force a rerun:
 npx nx run @test-api/pokemon-api:updateApi --skip-nx-cache --force
 ```
 
-After running the generator you will see a new package in the packages folder named pokemon-api.
+### Versioning policy
 
-## Run tasks
+The plugin version mirrors `@hey-api/openapi-ts`: `major.minor` must match, and the patch must be ≥ the openapi-ts patch (plugin-only fixes bump the patch). **Never edit `packages/nx-plugin/package.json` `version` manually** — the release pipeline owns it. Use the scripts instead:
 
-To run the dev server for your app, use:
-
-```sh
-npx nx serve test-plugin
+```bash
+pnpm run version:check:nx-plugin   # verify the current version satisfies the policy
+pnpm run version:sync:nx-plugin    # sync the version to match the openapi-ts dep exactly
+pnpm run version:bump:nx-plugin    # bump the patch for plugin-only releases
 ```
 
-To create a production bundle:
+Automation keeps this running hands-free:
 
-```sh
-npx nx build test-plugin
+- `sync-openapi.yml` checks npm daily and updates `@hey-api/openapi-ts` in this repo.
+- `release.yml` bumps the version, generates the changelog with git-cliff, tags, and dispatches the npm publish (with provenance).
+
+### Preview releases from PRs
+
+Comment `/preview` on a pull request (write access required) and the workflow publishes a prerelease build tagged `pr-<pr-number>`:
+
+```bash
+pnpm add -D @seriouslag/nx-openapi-ts-plugin@pr-<pr-number>
 ```
 
-To see all available targets to run for a project, run:
+Re-running `/preview` updates the same dist-tag with the latest build.
 
-```sh
-npx nx show project test-plugin
-```
+## License
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-Use the plugin's generator to create new projects.
-
-To generate a new application, use:
-
-```sh
-npx nx g @nx/react:app demo
-```
-
-To generate a new library, use:
-
-```sh
-npx nx g @nx/react:lib mylib
-```
-
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
-
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
-```
-
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
-
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
-```
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/getting-started/tutorials/react-monorepo-tutorial?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+[MIT](./packages/nx-plugin/LICENSE.md)
