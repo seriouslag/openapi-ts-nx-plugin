@@ -2,6 +2,24 @@ packages:
   - apps/*
   - packages/*
 
+# Security overrides for transitive deps whose parents have not yet released a
+# fix. Each entry is a Dependabot alert that the direct-dep versions cannot
+# clear on their own. Drop an entry once the parent bumps past it.
+overrides:
+  # GHSA-rgw5-rvv9-x895 — DoS. nx pins exactly 5.0.8.
+  brace-expansion: ^5.0.9
+  # GHSA-52cp-r559-cp3m — quadratic CPU on merge-key chains. Held to 4.x
+  # because 5.x is a breaking API change for @hey-api/json-schema-ref-parser.
+  js-yaml@4: ^4.3.0
+  # GHSA-96hv-2xvq-fx4p — memory-exhaustion DoS.
+  ws: ^8.21.0
+  # GHSA-xcpc-8h2w-3j85 — 4GB allocation from crafted ZIP.
+  adm-zip: ^0.6.0
+  # GHSA-7gcc-r8m5-44qm — host header injection via ctx.hostname.
+  koa: ^3.1.2
+  # GHSA-g7r4-m6w7-qqqr — dev-server arbitrary file read on Windows.
+  esbuild: ^0.28.1
+
 allowBuilds:
   '@swc/core': true
   '@tailwindcss/oxide': true
