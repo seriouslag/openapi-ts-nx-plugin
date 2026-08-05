@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.99.7 (2026-08-05)
+
+### ⬆️ Dependencies
+
+- **deps:** Update dependencies and clear Dependabot alerts (#34)([f0a9d48](https://github.com/seriouslag/openapi-ts-nx-plugin/commit/f0a9d4832f7692de9b94854bc23c20c7ca1fb93e))
+
+### 🐛 Bug Fixes
+
+- **ci:** Authenticate repo stats workflow with a PAT (#33)([35f2583](https://github.com/seriouslag/openapi-ts-nx-plugin/commit/35f25833ab9940eb724c786006591ebabaf13293))
+
 ## 0.99.6 (2026-07-07)
 
 ### 📚 Documentation
