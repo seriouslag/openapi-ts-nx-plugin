@@ -114,6 +114,13 @@ function rangeAdmits(range, version) {
  *
  * `sync-openapi.yml` bumps `@hey-api/openapi-ts` unattended and pushes straight
  * to main without touching our range, so nothing else would notice the drift.
+ *
+ * Returns `null` when `@hey-api/openapi-ts` is not installed: this reads the
+ * install rather than a declared string, so it is only answerable after
+ * `pnpm install`. `release.yml` runs no install (it is a git-and-node job), so
+ * the lockstep half of `--check` is skipped there and enforced in `ci.yml` and
+ * `publish.yml`, both of which install first — the latter being the gate that
+ * actually ships the package.
  */
 function getOpenapiCodegenCoreVersion() {
   const requireFromPlugin = createRequire(pluginPackageJsonPath);
@@ -124,9 +131,7 @@ function getOpenapiCodegenCoreVersion() {
       '@hey-api/openapi-ts/package.json',
     );
   } catch {
-    throw new Error(
-      '@hey-api/openapi-ts is not installed. Run `pnpm install` before checking the version policy.',
-    );
+    return null;
   }
 
   try {
@@ -201,7 +206,10 @@ if (checkOnly) {
 
   const codegenCoreVersion = getOpenapiCodegenCoreVersion();
 
-  if (!rangeAdmits(codegenCoreRange, codegenCoreVersion)) {
+  if (
+    codegenCoreVersion &&
+    !rangeAdmits(codegenCoreRange, codegenCoreVersion)
+  ) {
     failures.push(
       [
         '@hey-api/codegen-core is out of lockstep with @hey-api/openapi-ts.',
@@ -218,8 +226,21 @@ if (checkOnly) {
     process.exit(1);
   }
 
+  if (!codegenCoreVersion) {
+    console.warn(
+      'Skipped the @hey-api/codegen-core lockstep check: @hey-api/openapi-ts is not installed. Run pnpm install to include it.',
+    );
+  }
+
   console.log(
-    `Version policy check passed: plugin=${toVersionString(currentVersion)}, openapi=${toVersionString(openapiVersion)}, codegen-core=${codegenCoreVersion} (${codegenCoreRange})`,
+    [
+      'Version policy check passed:',
+      `plugin=${toVersionString(currentVersion)}`,
+      `openapi=${toVersionString(openapiVersion)}`,
+      codegenCoreVersion
+        ? `codegen-core=${codegenCoreVersion} (${codegenCoreRange})`
+        : 'codegen-core=not checked',
+    ].join(' '),
   );
   process.exit(0);
 }
@@ -236,17 +257,12 @@ if (bumpPatch) {
   process.exit(0);
 }
 
-// Informational output stays usable without an install, so a missing
-// @hey-api/openapi-ts is reported rather than thrown. --check does throw.
-let codegenCoreStatus;
-try {
-  const codegenCoreVersion = getOpenapiCodegenCoreVersion();
-  codegenCoreStatus = `${codegenCoreVersion} vs our ${codegenCoreRange} (lockstep: ${
-    rangeAdmits(codegenCoreRange, codegenCoreVersion) ? 'yes' : 'no'
-  })`;
-} catch (error) {
-  codegenCoreStatus = `unknown (${error.message.split('\n')[0]})`;
-}
+const codegenCoreVersion = getOpenapiCodegenCoreVersion();
+const codegenCoreStatus = codegenCoreVersion
+  ? `${codegenCoreVersion} vs our ${codegenCoreRange} (lockstep: ${
+      rangeAdmits(codegenCoreRange, codegenCoreVersion) ? 'yes' : 'no'
+    })`
+  : 'unknown (@hey-api/openapi-ts is not installed)';
 
 console.log(
   [
