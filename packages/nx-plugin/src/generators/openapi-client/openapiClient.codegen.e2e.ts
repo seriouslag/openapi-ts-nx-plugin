@@ -95,4 +95,65 @@ describe('real client codegen e2e', () => {
     const sdk = readFileSync(join(outputPath, 'sdk.gen.ts'), 'utf-8');
     expect(sdk).toContain('getPetById');
   });
+
+  /**
+   * `mergePluginConfigs` concatenates the executor's plugins with the config
+   * file's and lets `resolvePlugins` merge the duplicates by name. These two
+   * tests are the only thing holding that assumption up — the unit suite mocks
+   * `createClient`, so it can assert what we pass but never what the generator
+   * does with it. If a future `@hey-api/openapi-ts` stops merging duplicates,
+   * these fail rather than options going quietly missing again.
+   */
+  const generateWithConfigFile = async (configFileBody: string) => {
+    const root = mkdtempSync(join(tmpdir(), 'nx-openapi-plugin-opts-e2e-'));
+    tempRoots.push(root);
+
+    const specFile = join(root, 'spec.yaml');
+    writeFileSync(specFile, SPEC);
+    // Written without importing `defineConfig` so the temp dir needs no
+    // node_modules; jiti loads a plain default export happily.
+    const configFile = join(root, 'openapi-ts.config.mts');
+    writeFileSync(configFile, configFileBody);
+    const outputPath = join(root, 'generated');
+
+    return { configFile, outputPath, specFile };
+  };
+
+  it('applies a plugin option declared only in the config file', async () => {
+    const { configFile, outputPath, specFile } = await generateWithConfigFile(
+      `export default { plugins: [{ name: '@hey-api/sdk', asClass: true }] };`,
+    );
+
+    await generateClientCode({
+      clientType: '@hey-api/client-fetch',
+      configFile,
+      outputPath,
+      // The executor names the plugin; only the config file can configure it.
+      plugins: ['@hey-api/typescript', '@hey-api/sdk'],
+      specFile,
+    });
+
+    // asClass makes the SDK emit a class rather than bare exported functions.
+    const sdk = readFileSync(join(outputPath, 'sdk.gen.ts'), 'utf-8');
+    expect(sdk).toContain('export class');
+  });
+
+  it('keeps options from both sides for the same plugin', async () => {
+    const { configFile, outputPath, specFile } = await generateWithConfigFile(
+      `export default { plugins: [{ name: '@hey-api/sdk', validator: false }] };`,
+    );
+
+    await generateClientCode({
+      clientType: '@hey-api/client-fetch',
+      configFile,
+      outputPath,
+      plugins: ['@hey-api/typescript', { asClass: true, name: '@hey-api/sdk' }],
+      specFile,
+    });
+
+    // The config file also configures @hey-api/sdk. Letting either side's entry
+    // replace the other would drop `asClass` here.
+    const sdk = readFileSync(join(outputPath, 'sdk.gen.ts'), 'utf-8');
+    expect(sdk).toContain('export class');
+  });
 });

@@ -43,7 +43,12 @@ describe('mergePluginConfigs', () => {
     ]);
   });
 
-  it('substitutes the config file entry for the executor name, keeping executor order', () => {
+  it('appends the config file entries after the executor ones', () => {
+    // Duplicate names are left in deliberately: `resolvePlugins` merges them by
+    // name and keeps each plugin at its first position, so '@tanstack/react-query'
+    // ends up configured *and* ahead of 'zod'. Picking a winner here would drop
+    // options from whichever side lost. `openapiClient.codegen.e2e.ts` asserts
+    // the generator really does this.
     expect(
       mergePluginConfigs({
         clientType: '@hey-api/client-fetch',
@@ -52,12 +57,13 @@ describe('mergePluginConfigs', () => {
       }),
     ).toEqual([
       '@hey-api/client-fetch',
-      { mutationKeys: true, name: '@tanstack/react-query' },
+      '@tanstack/react-query',
       'zod',
+      { mutationKeys: true, name: '@tanstack/react-query' },
     ]);
   });
 
-  it('appends plugins that only the config file declares', () => {
+  it('includes plugins that only the config file declares', () => {
     expect(
       mergePluginConfigs({
         clientType: '@hey-api/client-fetch',
@@ -86,36 +92,18 @@ describe('mergePluginConfigs', () => {
   });
 
   it('lets the config file configure the client itself', () => {
+    // The bare client name comes first and the file's object second, which is
+    // the order `resolvePlugins` needs to replace the name with the object
+    // in place rather than ignore it.
     expect(
       mergePluginConfigs({
         clientType: '@hey-api/client-fetch',
         executorPlugins: [],
         filePlugins: [{ bundle: false, name: '@hey-api/client-fetch' }],
       }),
-    ).toEqual([{ bundle: false, name: '@hey-api/client-fetch' }]);
-  });
-
-  it('does not pass the client twice when a project also lists it explicitly', () => {
-    expect(
-      mergePluginConfigs({
-        clientType: '@hey-api/client-fetch',
-        executorPlugins: ['@hey-api/client-fetch', '@hey-api/typescript'],
-      }),
-    ).toEqual(['@hey-api/client-fetch', '@hey-api/typescript']);
-  });
-
-  it('keeps options the executor put on the client itself', () => {
-    expect(
-      mergePluginConfigs({
-        clientType: '@hey-api/client-fetch',
-        executorPlugins: [
-          { bundle: false, name: '@hey-api/client-fetch' },
-          '@hey-api/typescript',
-        ],
-      }),
     ).toEqual([
+      '@hey-api/client-fetch',
       { bundle: false, name: '@hey-api/client-fetch' },
-      '@hey-api/typescript',
     ]);
   });
 });
@@ -166,10 +154,14 @@ describe('generateClientCode plugin merging', () => {
       `export default { plugins: ['@hey-api/typescript', { name: '@tanstack/react-query', mutationKeys: true }] };`,
     );
 
+    // The file's entries are appended verbatim rather than folded into the
+    // executor's, duplicate names and all — resolvePlugins merges them by name.
     expect(await generate(configFile)).toMatchObject({
       configFile,
       plugins: [
         '@hey-api/client-fetch',
+        '@hey-api/typescript',
+        '@tanstack/react-query',
         '@hey-api/typescript',
         { mutationKeys: true, name: '@tanstack/react-query' },
       ],
@@ -240,6 +232,7 @@ describe('generateClientCode plugin merging', () => {
     expect((await generate(configFile)).plugins).toEqual([
       '@hey-api/client-fetch',
       '@hey-api/typescript',
+      '@tanstack/react-query',
       { mutationKeys: true, name: '@tanstack/react-query' },
     ]);
   });

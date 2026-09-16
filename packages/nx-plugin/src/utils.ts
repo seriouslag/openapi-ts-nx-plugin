@@ -140,6 +140,14 @@ export function findOpenApiConfigFile(projectRoot: string): string | undefined {
  * jobs, so we decline to guess. A single-config array export is read normally;
  * hey-api runs that as one job like any other. In every case the caller falls
  * back to the executor's own list, which is the pre-existing behaviour.
+ *
+ * Note that `createClient` then loads the file a second time, since we hand it
+ * the path rather than a resolved config. A config file exporting a *stateful*
+ * function is therefore evaluated twice, and its plugins could in principle come
+ * from a different evaluation than the rest of its settings. Resolving it once
+ * here instead would mean taking over everything `createClient` does with a
+ * `configFile` — relative-path resolution, `parser.hooks`, watch wiring — to fix
+ * a case no real config hits, so it keeps the path and re-reads.
  */
 async function readConfigFilePlugins(
   configFile: string,
@@ -174,14 +182,29 @@ async function readConfigFilePlugins(
 }
 
 /**
- * Combines the executor's `plugins` option with the ones declared in the
- * project's `openapi-ts.config.*`, keyed by plugin name.
+ * Concatenates the client, the executor's `plugins` option and the ones declared
+ * in the project's `openapi-ts.config.*` into the single list `createClient`
+ * takes.
  *
- * The executor's list sets the order, client first. The config file decides
- * *how* each plugin is configured, because it is the only place that can express
- * plugin options (`mutationKeys`, `asClass`, …). So where both name the same
- * plugin, the file's entry wins; plugins only the file declares are appended
- * rather than dropped, so they still run.
+ * Deliberately *not* deduplicated. `resolvePlugins` in `@hey-api/shared` already
+ * merges duplicate entries by name — a later object replaces an earlier bare
+ * name in place, and two objects are `deepMerge`d — keeping each plugin at the
+ * position of its first occurrence. Delegating to that is both simpler and
+ * strictly better than picking a winner here: an executor passing
+ * `{ name: '@hey-api/sdk', asClass: true }` and a config file declaring
+ * `{ name: '@hey-api/sdk', validator: false }` end up with *both* options, where
+ * any local "one side wins" rule would drop one of them.
+ *
+ * Duplicate merging landed in `@hey-api/openapi-ts` 0.99.0 ("config: merge
+ * duplicate plugin configurations"); earlier versions kept only the last
+ * instance. That is safe to rely on because openapi-ts is a direct dependency
+ * here, pinned by the version-mirror policy in CLAUDE.md, so the plugin always
+ * generates with a version that behaves this way.
+ *
+ * What this function is really for is getting the config file's entries into the
+ * list at all: `createClient` merges what we pass *over* the loaded file, and
+ * that merge replaces arrays wholesale, so a `plugins` array from us would
+ * otherwise discard the file's entirely. See {@link readConfigFilePlugins}.
  *
  * Entries are passed through verbatim: flattening them to names — which is what
  * this used to do — silently discarded every plugin option, whether it came
@@ -197,48 +220,7 @@ export function mergePluginConfigs({
   executorPlugins: Plugin[];
   filePlugins?: Plugin[];
 }): Plugin[] {
-  // The client runs first, but take its entry from the executor's own list when
-  // that list names it: prepending the bare name and deduping would keep the
-  // name and throw away any options the executor put on it.
-  const clientEntry =
-    executorPlugins.find((plugin) => getPluginName(plugin) === clientType) ??
-    clientType;
-  const selected = [clientEntry, ...executorPlugins];
-
-  if (!filePlugins?.length) {
-    return dedupePluginsByName(selected);
-  }
-
-  const byName = new Map(
-    filePlugins.map((plugin) => [getPluginName(plugin), plugin]),
-  );
-
-  const merged = selected.map(
-    (plugin) => byName.get(getPluginName(plugin)) ?? plugin,
-  );
-  const selectedNames = new Set(selected.map(getPluginName));
-  const fileOnly = filePlugins.filter(
-    (plugin) => !selectedNames.has(getPluginName(plugin)),
-  );
-
-  return dedupePluginsByName([...merged, ...fileOnly]);
-}
-
-/**
- * Keeps the first entry for each plugin name. The client is prepended to the
- * executor's list, so a project that also lists it explicitly would otherwise
- * pass it to the generator twice.
- */
-function dedupePluginsByName(plugins: Plugin[]): Plugin[] {
-  const seen = new Set<string>();
-  return plugins.filter((plugin) => {
-    const name = getPluginName(plugin);
-    if (seen.has(name)) {
-      return false;
-    }
-    seen.add(name);
-    return true;
-  });
+  return [clientType, ...executorPlugins, ...(filePlugins ?? [])];
 }
 
 /**
@@ -252,7 +234,7 @@ function dedupePluginsByName(plugins: Plugin[]): Plugin[] {
  * file (`mergeConfigs(fileConfig, userConfig)`).
  *
  * `plugins` is the exception: that same merge would replace the file's array
- * outright, so we combine the two lists ourselves first. See
+ * outright, so we read the file's entries and pass them alongside our own. See
  * {@link mergePluginConfigs}.
  */
 export async function generateClientCode({
