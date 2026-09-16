@@ -159,6 +159,9 @@ importers:
       api-smart-diff:
         specifier: ^1.0.6
         version: 1.0.6
+      c12:
+        specifier: ^3.3.4
+        version: 3.3.4(magicast@0.5.4)
       latest-version:
         specifier: ^9.0.0
         version: 9.0.0

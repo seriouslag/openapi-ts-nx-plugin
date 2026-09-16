@@ -1,4 +1,7 @@
 # Add files here to ignore them from prettier formatting
+# pnpm owns the lockfile's formatting; prettier rewrites every line of it,
+# burying the real dependency change in thousands of lines of noise.
+/pnpm-lock.yaml
 /dist
 /coverage
 /.nx/cache

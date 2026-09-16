@@ -142,16 +142,16 @@ npx nx run @my-org/my-api:updateApi
 
 <!-- options:update-api:start -->
 
-| Option      | Type                   | Default                 | Description                                                                                                                       |
-| ----------- | ---------------------- | ----------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `name`      | `string`               | _required_              | The name of the project.                                                                                                          |
-| `scope`     | `string`               | _required_              | The scope of the project.                                                                                                         |
-| `spec`      | `string`               | _required_              | Path to the OpenAPI spec file (URL or local path).                                                                                |
-| `directory` | `string`               | `libs`                  | Directory where the library will be created.                                                                                      |
-| `client`    | `string`               | `@hey-api/client-fetch` | The type of client to generate (@hey-api/client-fetch, @hey-api/client-axios, etc).                                               |
-| `plugins`   | `(string \| object)[]` | `[]`                    | The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { "name": "...", "asClass": true }.     |
-| `force`     | `boolean`              | `false`                 | If true, the Client code will be regenerated even if the spec has not changed, also pass --skip-nx-cache to avoid caching issues. |
-| `watch`     | `boolean`              | `false`                 | If true, the client will be watched for changes and regenerated when they occur.                                                  |
+| Option      | Type                   | Default                 | Description                                                                                                                                                                                                                                                                  |
+| ----------- | ---------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `name`      | `string`               | _required_              | The name of the project.                                                                                                                                                                                                                                                     |
+| `scope`     | `string`               | _required_              | The scope of the project.                                                                                                                                                                                                                                                    |
+| `spec`      | `string`               | _required_              | Path to the OpenAPI spec file (URL or local path).                                                                                                                                                                                                                           |
+| `directory` | `string`               | `libs`                  | Directory where the library will be created.                                                                                                                                                                                                                                 |
+| `client`    | `string`               | `@hey-api/client-fetch` | The type of client to generate (@hey-api/client-fetch, @hey-api/client-axios, etc).                                                                                                                                                                                          |
+| `plugins`   | `(string \| object)[]` | `[]`                    | The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { "name": "...", "asClass": true }. Where a plugin is named both here and in the project's openapi-ts.config.* file, the config file's entry wins, so plugin options belong there. |
+| `force`     | `boolean`              | `false`                 | If true, the Client code will be regenerated even if the spec has not changed, also pass --skip-nx-cache to avoid caching issues.                                                                                                                                            |
+| `watch`     | `boolean`              | `false`                 | If true, the client will be watched for changes and regenerated when they occur.                                                                                                                                                                                             |
 
 <!-- options:update-api:end -->
 
@@ -159,6 +159,25 @@ npx nx run @my-org/my-api:updateApi
 
 - If the spec is a **relative path** to a file inside another workspace project, that project is added as an implicit dependency — the assumption is that it generates the spec on build.
 - If the spec is a **URL**, it is fetched during cache checks to determine whether the client code needs to be regenerated.
+
+#### Plugin options
+
+Plugin **options** belong in the project's `openapi-ts.config.*`; the `plugins` executor option only selects which plugins run.
+
+```ts
+// openapi-ts.config.mts
+export default defineConfig({
+  plugins: [
+    '@hey-api/client-fetch',
+    // the executor lists '@tanstack/react-query' — this entry configures it
+    { name: '@tanstack/react-query', mutationKeys: true },
+  ],
+});
+```
+
+The executor reads the config file and merges the two lists **by plugin name**: the executor decides which plugins run and in what order, and where both name the same plugin the config file's entry wins. Plugins that only the config file declares are appended.
+
+This merge is why options survive. `@hey-api/openapi-ts` deep-merges what the executor passes over the loaded config file, and that merge replaces arrays wholesale — so passing `plugins` without merging first would discard the config file's array, options and all. If the config file cannot be read, or exports an array of configs, the executor falls back to its own `plugins` list unchanged.
 
 ## Inferred tasks
 
