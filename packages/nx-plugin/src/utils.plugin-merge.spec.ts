@@ -25,9 +25,9 @@ vi.mock('@nx/devkit', async (importOriginal) => {
 });
 
 /**
- * These tests use the real filesystem and the real `c12` loader rather than
- * mocking `node:fs` (as `utils.spec.ts` does) — the whole point is that plugin
- * options survive the round trip through an actual config file.
+ * These tests use the real filesystem and hey-api's real config loader rather
+ * than mocking `node:fs` (as `utils.spec.ts` does) — the whole point is that
+ * plugin options survive the round trip through an actual config file.
  */
 describe('mergePluginConfigs', () => {
   it('prepends the client to the executor plugins when there is no config file', () => {
@@ -102,6 +102,21 @@ describe('mergePluginConfigs', () => {
         executorPlugins: ['@hey-api/client-fetch', '@hey-api/typescript'],
       }),
     ).toEqual(['@hey-api/client-fetch', '@hey-api/typescript']);
+  });
+
+  it('keeps options the executor put on the client itself', () => {
+    expect(
+      mergePluginConfigs({
+        clientType: '@hey-api/client-fetch',
+        executorPlugins: [
+          { bundle: false, name: '@hey-api/client-fetch' },
+          '@hey-api/typescript',
+        ],
+      }),
+    ).toEqual([
+      { bundle: false, name: '@hey-api/client-fetch' },
+      '@hey-api/typescript',
+    ]);
   });
 });
 
@@ -217,9 +232,26 @@ describe('generateClientCode plugin merging', () => {
     ]);
   });
 
-  it('declines to guess which config an array export means', async () => {
+  it('reads a single-config array export, which is still one job', async () => {
     const configFile = await writeConfig(
       `export default [{ plugins: [{ name: '@tanstack/react-query', mutationKeys: true }] }];`,
+    );
+
+    expect((await generate(configFile)).plugins).toEqual([
+      '@hey-api/client-fetch',
+      '@hey-api/typescript',
+      { mutationKeys: true, name: '@tanstack/react-query' },
+    ]);
+  });
+
+  it('declines to guess when the config file exports several configs', async () => {
+    // One merged plugin list cannot stand in for several jobs, so we pass the
+    // executor's list through untouched — the pre-existing behaviour.
+    const configFile = await writeConfig(
+      `export default [
+         { plugins: [{ name: '@tanstack/react-query', mutationKeys: true }] },
+         { plugins: [{ name: '@hey-api/sdk', asClass: true }] },
+       ];`,
     );
 
     expect((await generate(configFile)).plugins).toEqual([

@@ -162,10 +162,12 @@ npx nx run @my-org/my-api:updateApi
 
 #### Plugin options
 
-Plugin **options** belong in the project's `openapi-ts.config.*`; the `plugins` executor option only selects which plugins run.
+Plugin **options** belong in the project's `openapi-ts.config.*`. The `plugins` executor option carries only names in practice, so it selects and orders plugins rather than configuring them.
 
 ```ts
 // openapi-ts.config.mts
+import { defineConfig } from '@hey-api/openapi-ts';
+
 export default defineConfig({
   plugins: [
     '@hey-api/client-fetch',
@@ -175,9 +177,9 @@ export default defineConfig({
 });
 ```
 
-The executor reads the config file and merges the two lists **by plugin name**: the executor decides which plugins run and in what order, and where both name the same plugin the config file's entry wins. Plugins that only the config file declares are appended.
+The executor reads the config file and merges the two lists **by plugin name**: the executor's list sets the order, and where both name the same plugin the config file's entry wins. Plugins that only the config file declares are appended, so they run too.
 
-This merge is why options survive. `@hey-api/openapi-ts` deep-merges what the executor passes over the loaded config file, and that merge replaces arrays wholesale — so passing `plugins` without merging first would discard the config file's array, options and all. If the config file cannot be read, or exports an array of configs, the executor falls back to its own `plugins` list unchanged.
+This merge is why options survive. `@hey-api/openapi-ts` deep-merges what the executor passes over the loaded config file, and that merge replaces arrays wholesale — so passing `plugins` without merging first would discard the config file's array, options and all. If the config file cannot be read, or exports several configs, the executor falls back to its own `plugins` list unchanged.
 
 ## Inferred tasks
 

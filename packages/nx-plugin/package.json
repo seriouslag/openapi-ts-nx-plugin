@@ -40,11 +40,11 @@
   "executors": "./executors.json",
   "plugin": "./dist/plugin.cjs.js",
   "dependencies": {
+    "@hey-api/codegen-core": "^0.9.1",
     "@hey-api/json-schema-ref-parser": "^1.4.4",
     "@hey-api/openapi-ts": "^0.99.0",
     "@nx/devkit": "^23.1.1",
     "api-smart-diff": "^1.0.6",
-    "c12": "^3.3.4",
     "latest-version": "^9.0.0",
     "prettier": "^3.9.6",
     "swagger2openapi": "^7.0.8",

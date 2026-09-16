@@ -126,39 +126,44 @@ export function findOpenApiConfigFile(projectRoot: string): string | undefined {
  * `plugins` we pass would discard the file's array wholesale, options and all.
  * See {@link mergePluginConfigs}.
  *
- * Loaded with `c12` exactly the way `@hey-api/openapi-ts` loads it — extension
- * stripped, `name: 'openapi-ts'` — so we see the same plugin list the generator
- * will. Stripping matters: it is how hey-api picks between sibling
- * `openapi-ts.config.ts` / `.mts` files, and reading a different one than the
- * generator would be worse than not reading one at all. A config file that
- * exports a promise or a function is resolved by `c12`; one exporting an array
- * of configs is ambiguous here, so we decline to guess.
+ * Read with hey-api's own `loadConfigFile`, so we see the same plugin list the
+ * generator will rather than a re-implementation that can drift from it. We
+ * still strip the extension the way `resolveJobs` does before calling it —
+ * that happens in `@hey-api/openapi-ts`, not in the loader — because it is how
+ * hey-api picks between sibling `openapi-ts.config.ts` / `.mts` files, and
+ * reading a different file than the generator would be worse than reading none.
+ * `userConfig: {}` keeps this a pure read: the loader merges it over the file,
+ * and merging an empty object changes nothing.
  *
- * Returns `undefined` when the file declares no plugins, cannot be read, or is
- * a multi-config array — in every case the caller falls back to the executor's
- * own list, which is the pre-existing behaviour.
+ * Returns `undefined` when the file declares no plugins, cannot be read, or
+ * exports *several* configs — one merged plugin list cannot stand in for several
+ * jobs, so we decline to guess. A single-config array export is read normally;
+ * hey-api runs that as one job like any other. In every case the caller falls
+ * back to the executor's own list, which is the pre-existing behaviour.
  */
 async function readConfigFilePlugins(
   configFile: string,
 ): Promise<Plugin[] | undefined> {
   try {
-    // Dynamic import: c12 is ESM-only and cannot be require()d from this CJS
-    // build.
-    const { loadConfig } = await import('c12');
+    // Dynamic import: @hey-api/codegen-core is ESM-only and cannot be
+    // require()d from this CJS build.
+    const { Logger, loadConfigFile } = await import('@hey-api/codegen-core');
     const parts = configFile.split('.');
-    const { config } = await loadConfig<{ plugins?: Plugin[] }>({
+    const { configs } = await loadConfigFile<{ plugins?: Plugin[] }>({
       configFile: parts.slice(0, parts.length - 1).join('.'),
+      logger: new Logger(),
       name: 'openapi-ts',
+      userConfig: {},
     });
 
-    if (Array.isArray(config)) {
+    if (configs.length > 1) {
       logger.debug(
         `Config file ${configFile} exports multiple configs; using the executor's plugins as-is.`,
       );
       return undefined;
     }
 
-    const plugins = config?.plugins;
+    const plugins = configs[0]?.plugins;
     return Array.isArray(plugins) && plugins.length > 0 ? plugins : undefined;
   } catch (error) {
     // Never fail codegen because we could not introspect the config file:
@@ -172,11 +177,11 @@ async function readConfigFilePlugins(
  * Combines the executor's `plugins` option with the ones declared in the
  * project's `openapi-ts.config.*`, keyed by plugin name.
  *
- * The executor decides *which* plugins run — its list, in its order, with the
- * client first. The config file decides *how* each one is configured, because
- * it is the only place that can express plugin options (`mutationKeys`,
- * `asClass`, …). So where both name the same plugin, the file's entry wins;
- * plugins only the file declares are appended rather than dropped.
+ * The executor's list sets the order, client first. The config file decides
+ * *how* each plugin is configured, because it is the only place that can express
+ * plugin options (`mutationKeys`, `asClass`, …). So where both name the same
+ * plugin, the file's entry wins; plugins only the file declares are appended
+ * rather than dropped, so they still run.
  *
  * Entries are passed through verbatim: flattening them to names — which is what
  * this used to do — silently discarded every plugin option, whether it came
@@ -192,7 +197,13 @@ export function mergePluginConfigs({
   executorPlugins: Plugin[];
   filePlugins?: Plugin[];
 }): Plugin[] {
-  const selected = [clientType, ...executorPlugins];
+  // The client runs first, but take its entry from the executor's own list when
+  // that list names it: prepending the bare name and deduping would keep the
+  // name and throw away any options the executor put on it.
+  const clientEntry =
+    executorPlugins.find((plugin) => getPluginName(plugin) === clientType) ??
+    clientType;
+  const selected = [clientEntry, ...executorPlugins];
 
   if (!filePlugins?.length) {
     return dedupePluginsByName(selected);
