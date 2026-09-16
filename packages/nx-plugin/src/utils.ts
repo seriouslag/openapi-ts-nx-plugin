@@ -28,11 +28,31 @@ import { convert } from 'swagger2openapi';
 
 import { CONSTANTS } from './vars';
 
-export type Plugin =
-  | string
-  | { asClass: boolean; name: '@hey-api/sdk' }
-  | { name: '@hey-api/schemas'; type: 'json' | 'form' };
+/**
+ * A plugin entry for `@hey-api/openapi-ts`: either a bare package name, or an
+ * object carrying that plugin's own options — e.g.
+ * `{ name: '@tanstack/react-query', mutationKeys: true }` or
+ * `{ name: '@hey-api/sdk', asClass: true }`.
+ *
+ * Options are passed through to the generator verbatim; this type deliberately
+ * does not enumerate them, since each plugin defines its own.
+ */
+export type Plugin = string | ({ name: string } & Record<string, unknown>);
 
+/**
+ * Builds the `openapi-ts` CLI invocation used by the generated `generateApi`
+ * target.
+ *
+ * Plugins are reduced to their names because `-p` takes nothing else. The CLI
+ * merges its flags over the `openapi-ts.config.*` it finds in the working
+ * directory, and that merge replaces arrays outright, so these `-p` flags
+ * override the config file's plugins and any options on them. The generated
+ * config file already lists the same plugins with their options, so a project
+ * that needs them (`asClass`, `mutationKeys`, …) should drop the `-p` flags from
+ * its `generateApi` command and let the config file speak for itself. The
+ * `updateApi` executor does not have this limitation — see
+ * {@link mergePluginConfigs}.
+ */
 export function generateClientCommand({
   clientType,
   outputPath,
@@ -98,14 +118,124 @@ export function findOpenApiConfigFile(projectRoot: string): string | undefined {
 }
 
 /**
+ * Reads the `plugins` array out of a project's `openapi-ts.config.*`.
+ *
+ * We have to load the file ourselves to merge with it: `createClient` merges
+ * what we pass *over* the loaded file with `mergeConfigs`, which recurses into
+ * plain objects but replaces everything else — arrays included. So any
+ * `plugins` we pass would discard the file's array wholesale, options and all.
+ * See {@link mergePluginConfigs}.
+ *
+ * Read with hey-api's own `loadConfigFile`, so we see the same plugin list the
+ * generator will rather than a re-implementation that can drift from it. We
+ * still strip the extension the way `resolveJobs` does before calling it —
+ * that happens in `@hey-api/openapi-ts`, not in the loader — because it is how
+ * hey-api picks between sibling `openapi-ts.config.ts` / `.mts` files, and
+ * reading a different file than the generator would be worse than reading none.
+ * `userConfig: {}` keeps this a pure read: the loader merges it over the file,
+ * and merging an empty object changes nothing.
+ *
+ * Returns `undefined` when the file declares no plugins, cannot be read, or
+ * exports *several* configs — one merged plugin list cannot stand in for several
+ * jobs, so we decline to guess. A single-config array export is read normally;
+ * hey-api runs that as one job like any other. In every case the caller falls
+ * back to the executor's own list, which is the pre-existing behaviour.
+ *
+ * Note that `createClient` then loads the file a second time, since we hand it
+ * the path rather than a resolved config. A config file exporting a *stateful*
+ * function is therefore evaluated twice, and its plugins could in principle come
+ * from a different evaluation than the rest of its settings. Resolving it once
+ * here instead would mean taking over everything `createClient` does with a
+ * `configFile` — relative-path resolution, `parser.hooks`, watch wiring — to fix
+ * a case no real config hits, so it keeps the path and re-reads.
+ */
+async function readConfigFilePlugins(
+  configFile: string,
+): Promise<Plugin[] | undefined> {
+  try {
+    // Dynamic import: @hey-api/codegen-core is ESM-only and cannot be
+    // require()d from this CJS build.
+    const { Logger, loadConfigFile } = await import('@hey-api/codegen-core');
+    const parts = configFile.split('.');
+    const { configs } = await loadConfigFile<{ plugins?: Plugin[] }>({
+      configFile: parts.slice(0, parts.length - 1).join('.'),
+      logger: new Logger(),
+      name: 'openapi-ts',
+      userConfig: {},
+    });
+
+    if (configs.length > 1) {
+      logger.debug(
+        `Config file ${configFile} exports multiple configs; using the executor's plugins as-is.`,
+      );
+      return undefined;
+    }
+
+    const plugins = configs[0]?.plugins;
+    return Array.isArray(plugins) && plugins.length > 0 ? plugins : undefined;
+  } catch (error) {
+    // Never fail codegen because we could not introspect the config file:
+    // createClient loads it again itself and will report a genuine problem.
+    logger.debug(`Could not read plugins from ${configFile}: ${error}`);
+    return undefined;
+  }
+}
+
+/**
+ * Concatenates the client, the executor's `plugins` option and the ones declared
+ * in the project's `openapi-ts.config.*` into the single list `createClient`
+ * takes.
+ *
+ * Deliberately *not* deduplicated. `resolvePlugins` in `@hey-api/shared` already
+ * merges duplicate entries by name — a later object replaces an earlier bare
+ * name in place, and two objects are `deepMerge`d — keeping each plugin at the
+ * position of its first occurrence. Delegating to that is both simpler and
+ * strictly better than picking a winner here: an executor passing
+ * `{ name: '@hey-api/sdk', asClass: true }` and a config file declaring
+ * `{ name: '@hey-api/sdk', validator: false }` end up with *both* options, where
+ * any local "one side wins" rule would drop one of them.
+ *
+ * Duplicate merging landed in `@hey-api/openapi-ts` 0.99.0 ("config: merge
+ * duplicate plugin configurations"); earlier versions kept only the last
+ * instance. That is safe to rely on because openapi-ts is a direct dependency
+ * here, pinned by the version-mirror policy in CLAUDE.md, so the plugin always
+ * generates with a version that behaves this way.
+ *
+ * What this function is really for is getting the config file's entries into the
+ * list at all: `createClient` merges what we pass *over* the loaded file, and
+ * that merge replaces arrays wholesale, so a `plugins` array from us would
+ * otherwise discard the file's entirely. See {@link readConfigFilePlugins}.
+ *
+ * Entries are passed through verbatim: flattening them to names — which is what
+ * this used to do — silently discarded every plugin option, whether it came
+ * from the config file or from the executor's own documented
+ * `{ name, asClass }` form.
+ */
+export function mergePluginConfigs({
+  clientType,
+  executorPlugins,
+  filePlugins,
+}: {
+  clientType: string;
+  executorPlugins: Plugin[];
+  filePlugins?: Plugin[];
+}): Plugin[] {
+  return [clientType, ...executorPlugins, ...(filePlugins ?? [])];
+}
+
+/**
  * Generates the client code using the spec file.
  *
  * When the project has an `openapi-ts.config.*` file, its path is passed to
  * `createClient` so settings that have no executor option — most importantly
  * `parser.hooks` (e.g. classifying a POST endpoint as a query) and `output`
- * tweaks — are honoured. The executor-derived `input`, `output`, and `plugins`
- * still win, because `@hey-api/openapi-ts` deep-merges the passed config over
- * the loaded file (`mergeConfigs(fileConfig, userConfig)`).
+ * tweaks — are honoured. The executor-derived `input` and `output` still win,
+ * because `@hey-api/openapi-ts` deep-merges the passed config over the loaded
+ * file (`mergeConfigs(fileConfig, userConfig)`).
+ *
+ * `plugins` is the exception: that same merge would replace the file's array
+ * outright, so we read the file's entries and pass them alongside our own. See
+ * {@link mergePluginConfigs}.
  */
 export async function generateClientCode({
   clientType,
@@ -123,11 +253,18 @@ export async function generateClientCode({
   watch?: boolean;
 }) {
   try {
-    const pluginNames = plugins.map(getPluginName);
     logger.info(`Generating client code using spec file...`);
     if (configFile) {
       logger.debug(`Using openapi-ts config file: ${configFile}`);
     }
+
+    const mergedPlugins = mergePluginConfigs({
+      clientType,
+      executorPlugins: plugins,
+      filePlugins: configFile
+        ? await readConfigFilePlugins(configFile)
+        : undefined,
+    });
 
     // Dynamic import: @hey-api/openapi-ts is ESM-only and cannot be require()d
     // from this CJS build.
@@ -137,7 +274,7 @@ export async function generateClientCode({
       ...(watch !== undefined ? { watch } : {}),
       input: specFile,
       output: outputPath,
-      plugins: [clientType, ...pluginNames] as ClientConfig['plugins'],
+      plugins: mergedPlugins as ClientConfig['plugins'],
     });
     logger.info(`Generated client code successfully.`);
   } catch (error) {

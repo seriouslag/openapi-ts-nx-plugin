@@ -109,6 +109,8 @@ pnpm run version:sync:nx-plugin    # sync the version to match the openapi-ts de
 pnpm run version:bump:nx-plugin    # bump the patch for plugin-only releases
 ```
 
+The check also verifies that our `@hey-api/codegen-core` range admits the version `@hey-api/openapi-ts` pins. The two must resolve to a single install — the plugin reads a project's `openapi-ts.config.*` with that package's config loader, and two copies would mean reading the config with a different loader than the generator uses, silently dropping plugin options.
+
 Automation keeps this running hands-free:
 
 - `sync-openapi.yml` checks npm daily and updates `@hey-api/openapi-ts` in this repo.

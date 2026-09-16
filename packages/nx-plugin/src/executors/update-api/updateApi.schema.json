@@ -36,7 +36,7 @@
     },
     "plugins": {
       "type": "array",
-      "description": "The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { \"name\": \"...\", \"asClass\": true }",
+      "description": "The plugins to be provided to @hey-api/openapi-ts. Items are plugin names or objects like { \"name\": \"...\", \"asClass\": true }. Plugins declared in the project's openapi-ts.config.* file are added to this list, and options from both sides are merged, so plugin options can live in either place.",
       "default": [],
       "items": {
         "oneOf": [
@@ -46,7 +46,8 @@
             "properties": {
               "asClass": { "type": "boolean" },
               "name": { "type": "string" }
-            }
+            },
+            "required": ["name"]
           }
         ]
       }

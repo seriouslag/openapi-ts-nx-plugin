@@ -40,6 +40,7 @@
   "executors": "./executors.json",
   "plugin": "./dist/plugin.cjs.js",
   "dependencies": {
+    "@hey-api/codegen-core": "^0.9.1",
     "@hey-api/json-schema-ref-parser": "^1.4.4",
     "@hey-api/openapi-ts": "^0.99.0",
     "@nx/devkit": "^23.1.1",

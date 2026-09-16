@@ -147,6 +147,9 @@ importers:
 
   packages/nx-plugin:
     dependencies:
+      '@hey-api/codegen-core':
+        specifier: ^0.9.1
+        version: 0.9.1(magicast@0.5.4)
       '@hey-api/json-schema-ref-parser':
         specifier: ^1.4.4
         version: 1.4.4

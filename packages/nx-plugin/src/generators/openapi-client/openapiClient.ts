@@ -442,9 +442,12 @@ export function normalizeOptions(
     }
     return plugin;
   });
+  // These option-carrying entries reach the generator intact as of the plugin
+  // merge in `generateClientCode`; before that, plugins were flattened to their
+  // names on the way to `createClient` and both `asClass` and the schemas
+  // `type` were silently dropped.
   const plugins = [
     default1,
-    // TODO: asClass is not working
     options.asClass
       ? {
           asClass: true,
