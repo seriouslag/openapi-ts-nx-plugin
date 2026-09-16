@@ -179,7 +179,7 @@ export default defineConfig({
 
 The executor reads the config file and hands `@hey-api/openapi-ts` **both** lists, the executor's first. `openapi-ts` then merges entries that name the same plugin, keeping each plugin at the position of its first mention — so the executor's list still sets the order, and where both sides configure the same plugin you get the union of their options rather than one of them being dropped.
 
-Combining the lists is what makes options survive at all. `openapi-ts` deep-merges what the executor passes over the loaded config file, and that merge replaces arrays wholesale — so passing `plugins` on its own would discard the config file's array, options and all. If the config file cannot be read, or exports several configs, the executor falls back to its own `plugins` list unchanged.
+Combining the lists is what makes options survive at all. `openapi-ts` deep-merges what the executor passes over the loaded config file, and that merge replaces arrays wholesale — so passing `plugins` on its own would discard the config file's array, options and all. Only this plugin introspection falls back: if the config file cannot be read, or exports several configs, the executor passes its own `plugins` list unchanged. The file itself is still handed to `openapi-ts`, which loads it and reports any genuine problem with it — a broken config file fails codegen as it always did.
 
 ## Inferred tasks
 

@@ -140,7 +140,7 @@ describe('real client codegen e2e', () => {
 
   it('keeps options from both sides for the same plugin', async () => {
     const { configFile, outputPath, specFile } = await generateWithConfigFile(
-      `export default { plugins: [{ name: '@hey-api/sdk', validator: false }] };`,
+      `export default { plugins: [{ name: '@hey-api/sdk', responseStyle: 'data' }] };`,
     );
 
     await generateClientCode({
@@ -151,9 +151,16 @@ describe('real client codegen e2e', () => {
       specFile,
     });
 
-    // The config file also configures @hey-api/sdk. Letting either side's entry
-    // replace the other would drop `asClass` here.
+    // Both sides configure @hey-api/sdk, and each option leaves its own mark on
+    // the output: `asClass` from the executor emits the class, `responseStyle`
+    // from the config file is passed to the request. Letting either entry
+    // replace the other drops one of these assertions.
+    //
+    // Both options have to be non-default for this to test anything. `validator`
+    // for instance already defaults to `false`, so `validator: false` on one side
+    // leaves no trace and the test would pass on the other side's option alone.
     const sdk = readFileSync(join(outputPath, 'sdk.gen.ts'), 'utf-8');
     expect(sdk).toContain('export class');
+    expect(sdk).toContain(`responseStyle: 'data'`);
   });
 });
