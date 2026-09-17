@@ -76,7 +76,7 @@ pnpm run version:bump:nx-plugin
 
 The version check runs on every CI push and every publish. A misaligned version will fail CI.
 
-`version:check:nx-plugin` also enforces the `@hey-api/codegen-core` lockstep described in [Key integration points](#key-integration-points-to-watch). It reads the version the installed `@hey-api/openapi-ts` resolves, so it needs `pnpm install` to have run first — both CI and publish install before calling it.
+`version:check:nx-plugin` also enforces the `@hey-api/codegen-core` lockstep described in [Key integration points](#key-integration-points-to-watch). It reads the version the installed `@hey-api/openapi-ts` resolves, so it needs `pnpm install` to have run first: `ci.yml` and `publish.yml` both install before calling it, and `publish.yml` is the gate the package actually ships through. `release.yml` runs no install (it is a git-and-node job), so that half of the check prints a skip notice there and only the version-mirror constraint is enforced.
 
 ---
 
