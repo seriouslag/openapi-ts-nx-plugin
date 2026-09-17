@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.99.8 (2026-09-17)
+
+### 🐛 Bug Fixes
+
+- **nx-plugin:** Keep plugin options from openapi-ts.config (#35)([ad3947b](https://github.com/seriouslag/openapi-ts-nx-plugin/commit/ad3947bcb89676fe9685c36e21e78e434f35beef))- **nx-plugin:** Skip codegen-core lockstep check without an install (#36)([ccfd503](https://github.com/seriouslag/openapi-ts-nx-plugin/commit/ccfd5032c7700440c6b79fd2b9ae9593781a7bc9))
+
 ## 0.99.7 (2026-08-05)
 
 ### ⬆️ Dependencies
